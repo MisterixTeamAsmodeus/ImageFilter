@@ -1,25 +1,37 @@
 #include <filters/FlipVerticalFilter.h>
 #include <ImageProcessor.h>
+#include <utils/FilterResult.h>
 #include <algorithm>
 
-bool FlipVerticalFilter::apply(ImageProcessor& image)
+FilterResult FlipVerticalFilter::apply(ImageProcessor& image)
 {
     if (!image.isValid())
     {
-        return false;
+        return FilterResult::failure(FilterError::InvalidImage, "Изображение не загружено");
     }
 
     const auto width = image.getWidth();
     const auto height = image.getHeight();
     const auto channels = image.getChannels();
 
-    if (channels != 3)
+    // Валидация размеров изображения
+    if (width <= 0 || height <= 0)
     {
-        return false;
+        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
+        return FilterResult::failure(FilterError::InvalidSize,
+                                     "Размер изображения должен быть больше нуля", ctx);
+    }
+
+    if (channels != 3 && channels != 4)
+    {
+        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
+        return FilterResult::failure(FilterError::InvalidChannels, 
+                                     "Ожидается 3 канала (RGB) или 4 канала (RGBA), получено: " + std::to_string(channels),
+                                     ctx);
     }
 
     auto* data = image.getData();
-    const auto row_size = static_cast<size_t>(width) * channels;
+    const auto row_size = static_cast<size_t>(width) * static_cast<size_t>(channels);
 
     // Меняем местами строки
     for (int y = 0; y < height / 2; ++y)
@@ -34,7 +46,23 @@ bool FlipVerticalFilter::apply(ImageProcessor& image)
         }
     }
 
-    return true;
+    return FilterResult::success();
 }
+
+std::string FlipVerticalFilter::getName() const
+{
+    return "flip_v";
+}
+
+std::string FlipVerticalFilter::getDescription() const
+{
+    return "Вертикальное отражение";
+}
+
+std::string FlipVerticalFilter::getCategory() const
+{
+    return "Геометрический";
+}
+
 
 

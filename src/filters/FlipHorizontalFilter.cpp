@@ -1,21 +1,33 @@
 #include <filters/FlipHorizontalFilter.h>
 #include <ImageProcessor.h>
 #include <utils/ParallelImageProcessor.h>
+#include <utils/FilterResult.h>
 
-bool FlipHorizontalFilter::apply(ImageProcessor& image)
+FilterResult FlipHorizontalFilter::apply(ImageProcessor& image)
 {
     if (!image.isValid())
     {
-        return false;
+        return FilterResult::failure(FilterError::InvalidImage, "Изображение не загружено");
     }
 
     const auto width = image.getWidth();
     const auto height = image.getHeight();
     const auto channels = image.getChannels();
 
-    if (channels != 3)
+    // Валидация размеров изображения
+    if (width <= 0 || height <= 0)
     {
-        return false;
+        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
+        return FilterResult::failure(FilterError::InvalidSize,
+                                     "Размер изображения должен быть больше нуля", ctx);
+    }
+
+    if (channels != 3 && channels != 4)
+    {
+        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
+        return FilterResult::failure(FilterError::InvalidChannels, 
+                                     "Ожидается 3 канала (RGB) или 4 канала (RGBA), получено: " + std::to_string(channels),
+                                     ctx);
     }
 
     auto* data = image.getData();
@@ -26,25 +38,41 @@ bool FlipHorizontalFilter::apply(ImageProcessor& image)
         {
             for (int y = start_row; y < end_row; ++y)
             {
-                const auto row_offset = static_cast<size_t>(y) * width * channels;
+                const auto row_offset = static_cast<size_t>(y) * static_cast<size_t>(width) * static_cast<size_t>(channels);
 
                 // Отражаем пиксели в строке
                 for (int x = 0; x < width / 2; ++x)
                 {
-                    const auto left_offset = row_offset + static_cast<size_t>(x) * channels;
-                    const auto right_offset = row_offset + static_cast<size_t>(width - 1 - x) * channels;
+                    const auto left_offset = row_offset + static_cast<size_t>(x) * static_cast<size_t>(channels);
+                    const auto right_offset = row_offset + static_cast<size_t>(width - 1 - x) * static_cast<size_t>(channels);
 
                     // Меняем местами пиксели
                     for (int c = 0; c < channels; ++c)
                     {
-                        std::swap(data[left_offset + c], data[right_offset + c]);
+                        std::swap(data[left_offset + static_cast<size_t>(c)], data[right_offset + static_cast<size_t>(c)]);
                     }
                 }
             }
         }
     );
 
-    return true;
+    return FilterResult::success();
 }
+
+std::string FlipHorizontalFilter::getName() const
+{
+    return "flip_h";
+}
+
+std::string FlipHorizontalFilter::getDescription() const
+{
+    return "Горизонтальное отражение";
+}
+
+std::string FlipHorizontalFilter::getCategory() const
+{
+    return "Геометрический";
+}
+
 
 

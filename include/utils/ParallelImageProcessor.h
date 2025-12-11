@@ -1,10 +1,15 @@
 #pragma once
 
 #include <cstdint>
+#include <execution>
 #include <functional>
+#include <memory>
 #include <thread>
 #include <vector>
 #include <algorithm>
+
+// Forward declarations
+class IThreadPool;
 
 /**
  * @brief Утилита для параллельной обработки изображений
@@ -17,6 +22,14 @@
  * - Автоматически определяет оптимальное количество потоков
  * - Разделяет изображение на горизонтальные полосы (строки)
  * - Обеспечивает безопасность потоков (thread-safe)
+ * - Использует ThreadPool для переиспользования потоков
+ * - Поддерживает std::execution::par_unseq для векторных операций
+ * - Адаптивный выбор между последовательной и параллельной обработкой
+ * 
+ * @note Адаптивный выбор:
+ *   - Маленькие изображения (< 100x100): последовательная обработка
+ *   - Средние изображения: параллельная обработка с меньшим количеством потоков
+ *   - Большие изображения: параллельная обработка со всеми доступными потоками
  */
 class ParallelImageProcessor
 {
@@ -27,15 +40,43 @@ public:
      * Разделяет изображение на полосы и обрабатывает каждую полосу
      * в отдельном потоке. Функция обработки получает диапазон строк [start_row, end_row).
      * 
+     * Автоматически выбирает оптимальный режим обработки на основе размера изображения:
+     * - Маленькие изображения (< 100x100 пикселей): последовательная обработка
+     * - Средние изображения: параллельная обработка с уменьшенным количеством потоков
+     * - Большие изображения: параллельная обработка со всеми доступными потоками
+     * 
+     * @param height Высота изображения в пикселях
+     * @param width Ширина изображения в пикселях (используется для адаптивного выбора)
+     * @param processRowRange Функция обработки диапазона строк: void(int start_row, int end_row)
+     * @param thread_pool Пул потоков для выполнения задач (nullptr = использовать глобальный пул)
+     * @param num_threads Количество потоков (0 = автоматическое определение на основе размера, используется только если thread_pool == nullptr)
+     */
+    static void processRowsParallel(
+        int height,
+        int width,
+        const std::function<void(int start_row, int end_row)>& processRowRange,
+        IThreadPool* thread_pool = nullptr,
+        int num_threads = 0
+    );
+
+    /**
+     * @brief Перегрузка для обратной совместимости (без width)
+     * 
+     * Использует только height для определения режима обработки.
+     * Рекомендуется использовать версию с width для лучшей оптимизации.
+     * 
      * @param height Высота изображения в пикселях
      * @param processRowRange Функция обработки диапазона строк: void(int start_row, int end_row)
-     * @param num_threads Количество потоков (0 = автоматическое определение)
+     * @param thread_pool Пул потоков для выполнения задач (nullptr = использовать глобальный пул)
+     * @param num_threads Количество потоков (0 = автоматическое определение, используется только если thread_pool == nullptr)
      */
     static void processRowsParallel(
         int height,
         const std::function<void(int start_row, int end_row)>& processRowRange,
+        IThreadPool* thread_pool = nullptr,
         int num_threads = 0
     );
+
 
     /**
      * @brief Получает оптимальное количество потоков для обработки
@@ -47,21 +88,44 @@ public:
      */
     static int getOptimalThreadCount() noexcept;
 
-private:
     /**
-     * @brief Обрабатывает диапазон строк в отдельном потоке
+     * @brief Определяет, следует ли использовать параллельную обработку
      * 
-     * Вспомогательная функция для выполнения обработки в потоке.
+     * Адаптивный выбор на основе размера изображения:
+     * - Маленькие изображения (< 100x100): false (последовательная обработка)
+     * - Средние и большие изображения: true (параллельная обработка)
      * 
-     * @param start_row Начальная строка (включительно)
-     * @param end_row Конечная строка (исключительно)
-     * @param processRowRange Функция обработки диапазона строк
+     * @param width Ширина изображения в пикселях
+     * @param height Высота изображения в пикселях
+     * @return true если рекомендуется параллельная обработка, false иначе
      */
-    static void processRowRangeThread(
-        int start_row,
-        int end_row,
-        const std::function<void(int, int)>& processRowRange
-    );
+    static bool shouldUseParallelProcessing(int width, int height) noexcept;
+
+    /**
+     * @brief Получает адаптивное количество потоков на основе размера изображения
+     * 
+     * @param width Ширина изображения в пикселях
+     * @param height Высота изображения в пикселях
+     * @param requested_threads Запрошенное количество потоков (0 = автоматическое)
+     * @return Оптимальное количество потоков для данного размера изображения
+     */
+    static int getAdaptiveThreadCount(int width, int height, int requested_threads = 0) noexcept;
+
+private:
+
+    /**
+     * @brief Порог размера изображения для последовательной обработки
+     * 
+     * Изображения меньше этого размера (width * height) обрабатываются последовательно.
+     */
+    static constexpr int SEQUENTIAL_THRESHOLD = 100 * 100; // 100x100 пикселей
+
+    /**
+     * @brief Порог размера изображения для использования всех потоков
+     * 
+     * Изображения больше этого размера используют все доступные потоки.
+     */
+    static constexpr int FULL_PARALLEL_THRESHOLD = 1000 * 1000; // 1000x1000 пикселей
 };
 
 

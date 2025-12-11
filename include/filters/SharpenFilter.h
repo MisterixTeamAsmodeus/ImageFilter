@@ -1,6 +1,7 @@
 #pragma once
 
 #include <filters/IFilter.h>
+#include <utils/BorderHandler.h>
 
 /**
  * @brief Фильтр повышения резкости изображения
@@ -19,10 +20,24 @@
 class SharpenFilter : public IFilter {
 public:
     /**
+     * @brief Конструктор фильтра повышения резкости
+     * @param borderStrategy Стратегия обработки границ (по умолчанию Mirror)
+     */
+    explicit SharpenFilter(BorderHandler::Strategy borderStrategy = BorderHandler::Strategy::Mirror) 
+        : border_handler_(borderStrategy) {}
+
+    /**
      * @brief Применяет фильтр повышения резкости
      * @param image Обрабатываемое изображение
      * @return true если фильтр применен успешно
      */
-    bool apply(ImageProcessor& image) override;
+    FilterResult apply(ImageProcessor& image) override;
+
+    std::string getName() const override;
+    std::string getDescription() const override;
+    std::string getCategory() const override;
+
+private:
+    BorderHandler border_handler_;  // Обработчик границ
 };
 

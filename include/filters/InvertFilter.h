@@ -13,9 +13,13 @@ public:
     /**
      * @brief Применяет фильтр инверсии к изображению
      * @param image Обрабатываемое изображение
-     * @return true если фильтр применен успешно
+     * @return FilterResult с кодом ошибки
      */
-    bool apply(ImageProcessor& image) override;
+    FilterResult apply(ImageProcessor& image) override;
+
+    std::string getName() const override;
+    std::string getDescription() const override;
+    std::string getCategory() const override;
 };
 
 

@@ -16,15 +16,20 @@ public:
     /**
      * @brief Конструктор фильтра контрастности
      * @param factor Коэффициент контрастности (1.0 = без изменений, >1.0 = больше контраст, <1.0 = меньше контраст)
+     *               Должен быть > 0. При некорректном значении используется 1.5
      */
-    explicit ContrastFilter(double factor = 1.5) : factor_(factor) {}
+    explicit ContrastFilter(double factor = 1.5) : factor_(factor > 0.0 ? factor : 1.5) {}
 
     /**
      * @brief Применяет фильтр контрастности к изображению
      * @param image Обрабатываемое изображение
-     * @return true если фильтр применен успешно
+     * @return FilterResult с кодом ошибки
      */
-    bool apply(ImageProcessor& image) override;
+    FilterResult apply(ImageProcessor& image) override;
+
+    std::string getName() const override;
+    std::string getDescription() const override;
+    std::string getCategory() const override;
 
 private:
     double factor_;  // Коэффициент контрастности

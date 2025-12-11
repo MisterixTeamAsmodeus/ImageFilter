@@ -1,22 +1,34 @@
 #include <filters/SepiaFilter.h>
 #include <ImageProcessor.h>
 #include <utils/ParallelImageProcessor.h>
+#include <utils/FilterResult.h>
 #include <algorithm>
 
-bool SepiaFilter::apply(ImageProcessor& image)
+FilterResult SepiaFilter::apply(ImageProcessor& image)
 {
     if (!image.isValid())
     {
-        return false;
+        return FilterResult::failure(FilterError::InvalidImage, "Изображение не загружено");
     }
 
     const auto width = image.getWidth();
     const auto height = image.getHeight();
     const auto channels = image.getChannels();
 
-    if (channels != 3)
+    // Валидация размеров изображения
+    if (width <= 0 || height <= 0)
     {
-        return false;
+        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
+        return FilterResult::failure(FilterError::InvalidSize,
+                                     "Размер изображения должен быть больше нуля", ctx);
+    }
+
+    if (channels != 3 && channels != 4)
+    {
+        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
+        return FilterResult::failure(FilterError::InvalidChannels, 
+                                     "Ожидается 3 канала (RGB) или 4 канала (RGBA), получено: " + std::to_string(channels),
+                                     ctx);
     }
 
     auto* data = image.getData();
@@ -28,7 +40,7 @@ bool SepiaFilter::apply(ImageProcessor& image)
         {
             for (int y = start_row; y < end_row; ++y)
             {
-                const auto row_offset = static_cast<size_t>(y) * width * channels;
+                const auto row_offset = static_cast<size_t>(y) * static_cast<size_t>(width) * static_cast<size_t>(channels);
 
                 for (int x = 0; x < width; ++x)
                 {
@@ -45,7 +57,7 @@ bool SepiaFilter::apply(ImageProcessor& image)
                     constexpr int G_TO_B = 35000; // 0.534 * 65536
                     constexpr int B_TO_B = 8584; // 0.131 * 65536
 
-                    const auto pixel_offset = row_offset + static_cast<size_t>(x) * channels;
+                    const auto pixel_offset = row_offset + static_cast<size_t>(x) * static_cast<size_t>(channels);
 
                     const auto r = static_cast<int>(data[pixel_offset + 0]);
                     const auto g = static_cast<int>(data[pixel_offset + 1]);
@@ -65,7 +77,23 @@ bool SepiaFilter::apply(ImageProcessor& image)
         }
     );
 
-    return true;
+    return FilterResult::success();
 }
+
+std::string SepiaFilter::getName() const
+{
+    return "sepia";
+}
+
+std::string SepiaFilter::getDescription() const
+{
+    return "Эффект сепии (винтажный)";
+}
+
+std::string SepiaFilter::getCategory() const
+{
+    return "Цветовой";
+}
+
 
 

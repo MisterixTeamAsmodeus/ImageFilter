@@ -1,32 +1,49 @@
 #include <filters/EmbossFilter.h>
 #include <ImageProcessor.h>
 #include <utils/ParallelImageProcessor.h>
+#include <utils/FilterResult.h>
+#include <utils/BorderHandler.h>
 #include <algorithm>
 #include <vector>
 
-bool EmbossFilter::apply(ImageProcessor& image)
+FilterResult EmbossFilter::apply(ImageProcessor& image)
 {
     if (!image.isValid())
     {
-        return false;
+        return FilterResult::failure(FilterError::InvalidImage, "Изображение не загружено");
     }
 
     const auto width = image.getWidth();
     const auto height = image.getHeight();
     const auto channels = image.getChannels();
 
-    if (channels != 3)
+    // Валидация размеров изображения
+    if (width <= 0 || height <= 0)
     {
-        return false;
+        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
+        return FilterResult::failure(FilterError::InvalidSize,
+                                     "Размер изображения должен быть больше нуля", ctx);
+    }
+
+    if (channels != 3 && channels != 4)
+    {
+        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
+        return FilterResult::failure(FilterError::InvalidChannels, 
+                                     "Ожидается 3 канала (RGB) или 4 канала (RGBA), получено: " + std::to_string(channels),
+                                     ctx);
     }
 
     const auto* input_data = image.getData();
-    std::vector<uint8_t> result(static_cast<size_t>(width) * height * channels);
+    const auto buffer_size = static_cast<size_t>(width) * static_cast<size_t>(height) * static_cast<size_t>(channels);
+    
+    // Создаем буфер для результата
+    std::vector<uint8_t> result(buffer_size);
 
 
     ParallelImageProcessor::processRowsParallel(
         height,
-        [width, height, channels, input_data, &result](int start_row, int end_row)
+        width,
+        [width, height, channels, input_data, &result, this](int start_row, int end_row)
         {
             for (int y = start_row; y < end_row; ++y)
             {
@@ -50,24 +67,19 @@ bool EmbossFilter::apply(ImageProcessor& image)
                                 const auto px = x + kx;
                                 const auto py = y + ky;
 
-                                // Обработка границ: используем отражение
-                                int clamped_x = px;
-                                if (clamped_x < 0) clamped_x = -clamped_x;
-                                else if (clamped_x >= width) clamped_x = 2 * width - clamped_x - 1;
+                                // Обработка границ с использованием BorderHandler
+                                const auto clamped_x = border_handler_.getX(px, width);
+                                const auto clamped_y = border_handler_.getY(py, height);
 
-                                int clamped_y = py;
-                                if (clamped_y < 0) clamped_y = -clamped_y;
-                                else if (clamped_y >= height) clamped_y = 2 * height - clamped_y - 1;
-
-                                const auto pixel_offset = (static_cast<size_t>(clamped_y) * width + clamped_x) *
-                                    channels + c;
+                                const auto pixel_offset = (static_cast<size_t>(clamped_y) * static_cast<size_t>(width) + static_cast<size_t>(clamped_x)) *
+                                    static_cast<size_t>(channels) + static_cast<size_t>(c);
                                 sum += static_cast<int>(input_data[pixel_offset]) * emboss_kernel[ky + 1][kx + 1];
                             }
                         }
 
                         // Добавляем 128 для смещения в средний диапазон
                         const auto value = sum + 128;
-                        const auto pixel_offset = (static_cast<size_t>(y) * width + x) * channels + c;
+                        const auto pixel_offset = (static_cast<size_t>(y) * static_cast<size_t>(width) + static_cast<size_t>(x)) * static_cast<size_t>(channels) + static_cast<size_t>(c);
                         result[pixel_offset] = static_cast<uint8_t>(std::max(0, std::min(255, value)));
                     }
                 }
@@ -79,7 +91,23 @@ bool EmbossFilter::apply(ImageProcessor& image)
     auto* data = image.getData();
     std::ranges::copy(result, data);
 
-    return true;
+    return FilterResult::success();
 }
+
+std::string EmbossFilter::getName() const
+{
+    return "emboss";
+}
+
+std::string EmbossFilter::getDescription() const
+{
+    return "Эффект рельефа";
+}
+
+std::string EmbossFilter::getCategory() const
+{
+    return "Края и детали";
+}
+
 
 

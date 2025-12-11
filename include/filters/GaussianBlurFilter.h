@@ -1,8 +1,11 @@
 #pragma once
 
 #include <filters/IFilter.h>
+#include <utils/BorderHandler.h>
 #include <cstdint>
 #include <vector>
+#include <unordered_map>
+#include <shared_mutex>
 
 /**
  * @brief Фильтр размытия по Гауссу
@@ -22,56 +25,26 @@ public:
     /**
      * @brief Конструктор фильтра размытия
      * @param radius Радиус размытия (по умолчанию 5.0)
+     *               Должен быть > 0. При некорректном значении используется 5.0
+     * @param borderStrategy Стратегия обработки границ (по умолчанию Mirror)
      */
-    explicit GaussianBlurFilter(double radius = 5.0) : radius_(radius) {}
+    explicit GaussianBlurFilter(double radius = 5.0, 
+                               BorderHandler::Strategy borderStrategy = BorderHandler::Strategy::Mirror) 
+        : radius_(radius > 0.0 ? radius : 5.0), border_handler_(borderStrategy) {}
 
     /**
      * @brief Применяет фильтр размытия по Гауссу
      * @param image Обрабатываемое изображение
-     * @return true если фильтр применен успешно
+     * @return FilterResult с кодом ошибки
      */
-    bool apply(ImageProcessor& image) override;
+    FilterResult apply(ImageProcessor& image) override;
 
-private:
-    /**
-     * @brief Генерирует одномерное ядро Гаусса в целочисленном формате
-     * @param radius Радиус размытия
-     * @param sigma Стандартное отклонение (вычисляется из radius)
-     * @return Вектор коэффициентов ядра (масштабированные на 65536 для точности)
-     */
-    static std::vector<int32_t> generateKernel(double radius, const double& sigma);
-
-    /**
-     * @brief Нормализует ядро (сумма коэффициентов = масштаб)
-     * @param kernel Ядро для нормализации
-     */
-    static void normalizeKernel(std::vector<int32_t>& kernel);
-
-    /**
-     * @brief Применяет одномерное ядро по горизонтали
-     * @param image Исходное изображение
-     * @param kernel Ядро для применения (целочисленное, масштабированное)
-     * @return Вектор с промежуточными результатами
-     */
-    static std::vector<uint8_t> applyHorizontalKernel(
-        const ImageProcessor& image, 
-        const std::vector<int32_t>& kernel
-    );
-
-    /**
-     * @brief Применяет одномерное ядро по вертикали
-     * @param horizontalResult Результат горизонтального применения
-     * @param image Исходное изображение (для получения размеров)
-     * @param kernel Ядро для применения (целочисленное, масштабированное)
-     * @return Финальный результат размытия
-     */
-    static std::vector<uint8_t> applyVerticalKernel(
-        const std::vector<uint8_t>& horizontalResult,
-        const ImageProcessor& image,
-        const std::vector<int32_t>& kernel
-    );
+    std::string getName() const override;
+    std::string getDescription() const override;
+    std::string getCategory() const override;
 
 private:
     double radius_;  // Радиус размытия
+    BorderHandler border_handler_;  // Обработчик границ
 };
 

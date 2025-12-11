@@ -21,7 +21,11 @@ public:
      * @param image Обрабатываемое изображение
      * @return true если фильтр применен успешно
      */
-    bool apply(ImageProcessor& image) override;
+    FilterResult apply(ImageProcessor& image) override;
+
+    std::string getName() const override;
+    std::string getDescription() const override;
+    std::string getCategory() const override;
 
 private:
     bool clockwise_;  // Направление поворота

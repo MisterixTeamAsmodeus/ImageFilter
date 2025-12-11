@@ -1,6 +1,7 @@
 #pragma once
 
 #include <filters/IFilter.h>
+#include <utils/BorderHandler.h>
 
 /**
  * @brief Фильтр детекции краёв (оператор Собеля)
@@ -12,11 +13,25 @@
 class EdgeDetectionFilter : public IFilter {
 public:
     /**
+     * @brief Конструктор фильтра детекции краёв
+     * @param borderStrategy Стратегия обработки границ (по умолчанию Mirror)
+     */
+    explicit EdgeDetectionFilter(BorderHandler::Strategy borderStrategy = BorderHandler::Strategy::Mirror) 
+        : border_handler_(borderStrategy) {}
+
+    /**
      * @brief Применяет фильтр детекции краёв к изображению
      * @param image Обрабатываемое изображение
      * @return true если фильтр применен успешно
      */
-    bool apply(ImageProcessor& image) override;
+    FilterResult apply(ImageProcessor& image) override;
+
+    std::string getName() const override;
+    std::string getDescription() const override;
+    std::string getCategory() const override;
+
+private:
+    BorderHandler border_handler_;  // Обработчик границ
 };
 
 

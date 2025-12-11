@@ -1,6 +1,7 @@
 #pragma once
 
 #include <filters/IFilter.h>
+#include <utils/BorderHandler.h>
 
 /**
  * @brief Фильтр размытия движения
@@ -12,21 +13,31 @@ class MotionBlurFilter : public IFilter {
 public:
     /**
      * @brief Конструктор фильтра размытия движения
-     * @param length Длина размытия в пикселях (по умолчанию 10)
+     * @param length Длина размытия в пикселях (по умолчанию 10, должен быть > 0)
      * @param angle Угол направления размытия в градусах (0 = горизонтально, 90 = вертикально, по умолчанию 0)
+     *              При некорректных значениях используются значения по умолчанию
+     * @param borderStrategy Стратегия обработки границ (по умолчанию Mirror)
      */
-    explicit MotionBlurFilter(int length = 10, double angle = 0.0) : length_(length), angle_(angle) {}
+    explicit MotionBlurFilter(int length = 10, 
+                              double angle = 0.0,
+                              BorderHandler::Strategy borderStrategy = BorderHandler::Strategy::Mirror) 
+        : angle_(angle), length_(length > 0 ? length : 10), border_handler_(borderStrategy) {}
 
     /**
      * @brief Применяет фильтр размытия движения к изображению
      * @param image Обрабатываемое изображение
      * @return true если фильтр применен успешно
      */
-    bool apply(ImageProcessor& image) override;
+    FilterResult apply(ImageProcessor& image) override;
+
+    std::string getName() const override;
+    std::string getDescription() const override;
+    std::string getCategory() const override;
 
 private:
-    int length_;     // Длина размытия
     double angle_;   // Угол направления размытия в градусах
+    int length_;     // Длина размытия
+    BorderHandler border_handler_;  // Обработчик границ
 };
 
 

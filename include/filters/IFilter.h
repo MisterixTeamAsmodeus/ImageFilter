@@ -1,5 +1,8 @@
 #pragma once
 
+#include <utils/FilterResult.h>
+#include <string>
+
 class ImageProcessor;
 
 /**
@@ -11,21 +14,42 @@ class ImageProcessor;
  * Особенности C++20:
  * - Использует виртуальный деструктор для корректного удаления объектов через указатель на базовый класс
  * - Позволяет работать с фильтрами через указатели на интерфейс (паттерн Strategy)
+ * - Использует FilterResult для структурированной обработки ошибок
  */
 class IFilter {
 public:
     /**
      * @brief Виртуальный деструктор
      * 
-     * Необходим для корректного удаления объектов через указатель на базовый класс
+     * Необходим для корректного удаления объектов через указатель на базовый класс.
+     * Определение вынесено в .cpp файл для предотвращения создания vtable в каждой единице трансляции.
      */
-    virtual ~IFilter() = default;
+    virtual ~IFilter();
 
     /**
      * @brief Применяет фильтр к изображению
      * @param image Обрабатываемое изображение
-     * @return true если фильтр применен успешно, false в противном случае
+     * @return FilterResult с кодом ошибки и опциональным сообщением
      */
-    virtual bool apply(ImageProcessor& image) = 0;
+    virtual FilterResult apply(ImageProcessor& image) = 0;
+
+    /**
+     * @brief Возвращает имя фильтра
+     * @return Строка с именем фильтра
+     */
+    [[nodiscard]] virtual std::string getName() const = 0;
+
+    /**
+     * @brief Возвращает описание фильтра
+     * @return Строка с описанием фильтра
+     */
+    [[nodiscard]] virtual std::string getDescription() const = 0;
+
+    /**
+     * @brief Возвращает категорию фильтра
+     * @return Строка с категорией (например, "Цветовой", "Геометрический", "Края и детали", "Размытие и шум", "Стилистический")
+     */
+    [[nodiscard]] virtual std::string getCategory() const = 0;
+
 };
 

@@ -13,15 +13,21 @@ public:
     /**
      * @brief Конструктор фильтра шума
      * @param intensity Интенсивность шума (0.0 - 1.0, где 1.0 = максимальный шум, по умолчанию 0.1)
+     *                  При некорректном значении используется 0.1
      */
-    explicit NoiseFilter(double intensity = 0.1) : intensity_(intensity) {}
+    explicit NoiseFilter(double intensity = 0.1) 
+        : intensity_((intensity >= 0.0 && intensity <= 1.0) ? intensity : 0.1) {}
 
     /**
      * @brief Применяет фильтр шума к изображению
      * @param image Обрабатываемое изображение
      * @return true если фильтр применен успешно
      */
-    bool apply(ImageProcessor& image) override;
+    FilterResult apply(ImageProcessor& image) override;
+
+    std::string getName() const override;
+    std::string getDescription() const override;
+    std::string getCategory() const override;
 
 private:
     double intensity_;  // Интенсивность шума

@@ -1,22 +1,46 @@
 #include <filters/SaturationFilter.h>
 #include <ImageProcessor.h>
 #include <utils/ParallelImageProcessor.h>
+#include <utils/FilterResult.h>
 #include <algorithm>
 
-bool SaturationFilter::apply(ImageProcessor& image)
+FilterResult SaturationFilter::apply(ImageProcessor& image)
 {
     if (!image.isValid())
     {
-        return false;
+        return FilterResult::failure(FilterError::InvalidImage, "Изображение не загружено");
     }
 
     const auto width = image.getWidth();
     const auto height = image.getHeight();
     const auto channels = image.getChannels();
 
-    if (channels != 3)
+    // Валидация размеров изображения
+    if (width <= 0 || height <= 0)
     {
-        return false;
+        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
+        ctx.filter_params = "factor=" + std::to_string(factor_);
+        return FilterResult::failure(FilterError::InvalidSize,
+                                     "Размер изображения должен быть больше нуля", ctx);
+    }
+
+    if (channels != 3 && channels != 4)
+    {
+        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
+        ctx.filter_params = "factor=" + std::to_string(factor_);
+        return FilterResult::failure(FilterError::InvalidChannels, 
+                                     "Ожидается 3 канала (RGB) или 4 канала (RGBA), получено: " + std::to_string(channels),
+                                     ctx);
+    }
+
+    // Валидация параметра фильтра
+    if (factor_ < 0.0)
+    {
+        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
+        ctx.filter_params = "factor=" + std::to_string(factor_);
+        return FilterResult::failure(FilterError::InvalidFactor,
+                                     "Коэффициент насыщенности должен быть >= 0, получено: " + std::to_string(factor_),
+                                     ctx);
     }
 
     auto* data = image.getData();
@@ -28,7 +52,7 @@ bool SaturationFilter::apply(ImageProcessor& image)
         {
             for (int y = start_row; y < end_row; ++y)
             {
-                const auto row_offset = static_cast<size_t>(y) * width * channels;
+                const auto row_offset = static_cast<size_t>(y) * static_cast<size_t>(width) * static_cast<size_t>(channels);
 
                 for (int x = 0; x < width; ++x)
                 {
@@ -36,7 +60,7 @@ bool SaturationFilter::apply(ImageProcessor& image)
                     constexpr int R_COEFF = 19595; // 0.299 * 65536
                     constexpr int G_COEFF = 38470; // 0.587 * 65536
                     constexpr int B_COEFF = 7471; // 0.114 * 65536
-                    const auto pixel_offset = row_offset + static_cast<size_t>(x) * channels;
+                    const auto pixel_offset = row_offset + static_cast<size_t>(x) * static_cast<size_t>(channels);
 
                     const auto r = static_cast<int>(data[pixel_offset + 0]);
                     const auto g = static_cast<int>(data[pixel_offset + 1]);
@@ -58,7 +82,23 @@ bool SaturationFilter::apply(ImageProcessor& image)
         }
     );
 
-    return true;
+    return FilterResult::success();
 }
+
+std::string SaturationFilter::getName() const
+{
+    return "saturation";
+}
+
+std::string SaturationFilter::getDescription() const
+{
+    return "Изменение насыщенности";
+}
+
+std::string SaturationFilter::getCategory() const
+{
+    return "Цветовой";
+}
+
 
 

@@ -1,28 +1,44 @@
 #include <filters/OutlineFilter.h>
 #include <ImageProcessor.h>
 #include <utils/ParallelImageProcessor.h>
+#include <utils/FilterResult.h>
+#include <utils/BorderHandler.h>
 #include <vector>
 
-bool OutlineFilter::apply(ImageProcessor& image)
+FilterResult OutlineFilter::apply(ImageProcessor& image)
 {
     if (!image.isValid())
     {
-        return false;
+        return FilterResult::failure(FilterError::InvalidImage, "Изображение не загружено");
     }
 
     const auto width = image.getWidth();
     const auto height = image.getHeight();
     const auto channels = image.getChannels();
 
-    if (channels != 3)
+    // Валидация размеров изображения
+    if (width <= 0 || height <= 0)
     {
-        return false;
+        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
+        return FilterResult::failure(FilterError::InvalidSize,
+                                     "Размер изображения должен быть больше нуля", ctx);
+    }
+
+    if (channels != 3 && channels != 4)
+    {
+        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
+        return FilterResult::failure(FilterError::InvalidChannels, 
+                                     "Ожидается 3 канала (RGB) или 4 канала (RGBA), получено: " + std::to_string(channels),
+                                     ctx);
     }
 
     const auto* input_data = image.getData();
 
     // Сначала преобразуем в градации серого
-    std::vector<uint8_t> grayscale(static_cast<size_t>(width) * height);
+    const auto grayscale_size = static_cast<size_t>(width) * static_cast<size_t>(height);
+    
+    // Создаем буфер для градаций серого
+    std::vector<uint8_t> grayscale(grayscale_size);
 
     for (int y = 0; y < height; ++y)
     {
@@ -32,18 +48,19 @@ bool OutlineFilter::apply(ImageProcessor& image)
             constexpr int G_COEFF = 38470;
             constexpr int B_COEFF = 7471;
 
-            const auto pixel_offset = (static_cast<size_t>(y) * width + x) * channels;
+            const auto pixel_offset = (static_cast<size_t>(y) * static_cast<size_t>(width) + static_cast<size_t>(x)) * static_cast<size_t>(channels);
             const auto r = static_cast<int>(input_data[pixel_offset + 0]);
             const auto g = static_cast<int>(input_data[pixel_offset + 1]);
             const auto b = static_cast<int>(input_data[pixel_offset + 2]);
-            grayscale[static_cast<size_t>(y) * width + x] = static_cast<uint8_t>((R_COEFF * r + G_COEFF * g + B_COEFF *
+            grayscale[static_cast<size_t>(y) * static_cast<size_t>(width) + static_cast<size_t>(x)] = static_cast<uint8_t>((R_COEFF * r + G_COEFF * g + B_COEFF *
                 b) >> 16);
         }
     }
-    std::vector<int> laplacian_result(static_cast<size_t>(width) * height);
+    std::vector<int> laplacian_result(static_cast<size_t>(width) * static_cast<size_t>(height));
     ParallelImageProcessor::processRowsParallel(
         height,
-        [width, height, &grayscale, &laplacian_result](int start_row, int end_row)
+        width,
+        [width, height, &grayscale, &laplacian_result, this](int start_row, int end_row)
         {
             for (int y = start_row; y < end_row; ++y)
             {
@@ -65,21 +82,17 @@ bool OutlineFilter::apply(ImageProcessor& image)
                             const auto px = x + kx;
                             const auto py = y + ky;
 
-                            int clamped_x = px;
-                            if (clamped_x < 0) clamped_x = -clamped_x;
-                            else if (clamped_x >= width) clamped_x = 2 * width - clamped_x - 1;
+                            // Обработка границ с использованием BorderHandler
+                            const auto clamped_x = border_handler_.getX(px, width);
+                            const auto clamped_y = border_handler_.getY(py, height);
 
-                            int clamped_y = py;
-                            if (clamped_y < 0) clamped_y = -clamped_y;
-                            else if (clamped_y >= height) clamped_y = 2 * height - clamped_y - 1;
-
-                            const auto pixel_value = static_cast<int>(grayscale[static_cast<size_t>(clamped_y) * width +
-                                clamped_x]);
+                            const auto pixel_value = static_cast<int>(grayscale[static_cast<size_t>(clamped_y) * static_cast<size_t>(width) +
+                                static_cast<size_t>(clamped_x)]);
                             sum += pixel_value * laplacian_kernel[ky + 1][kx + 1];
                         }
                     }
 
-                    laplacian_result[static_cast<size_t>(y) * width + x] = sum;
+                    laplacian_result[static_cast<size_t>(y) * static_cast<size_t>(width) + static_cast<size_t>(x)] = sum;
                 }
             }
         }
@@ -106,9 +119,11 @@ bool OutlineFilter::apply(ImageProcessor& image)
                 {
                     for (int x = 0; x < width; ++x)
                     {
-                        const auto pixel_offset = (static_cast<size_t>(y) * width + x) * channels;
-                        const auto laplacian = laplacian_result[static_cast<size_t>(y) * width + x];
-                        const auto normalized = static_cast<uint8_t>(((laplacian - min_val) * 255) / range);
+                        const auto pixel_offset = (static_cast<size_t>(y) * static_cast<size_t>(width) + static_cast<size_t>(x)) * static_cast<size_t>(channels);
+                        const auto laplacian = laplacian_result[static_cast<size_t>(y) * static_cast<size_t>(width) + static_cast<size_t>(x)];
+                        // Защита от переполнения при умножении
+                        const int64_t numerator = static_cast<int64_t>(laplacian - min_val) * 255;
+                        const auto normalized = static_cast<uint8_t>(numerator / range);
 
                         data[pixel_offset + 0] = normalized;
                         data[pixel_offset + 1] = normalized;
@@ -119,7 +134,23 @@ bool OutlineFilter::apply(ImageProcessor& image)
         );
     }
 
-    return true;
+    return FilterResult::success();
 }
+
+std::string OutlineFilter::getName() const
+{
+    return "outline";
+}
+
+std::string OutlineFilter::getDescription() const
+{
+    return "Выделение контуров";
+}
+
+std::string OutlineFilter::getCategory() const
+{
+    return "Края и детали";
+}
+
 
 
