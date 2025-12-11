@@ -22,11 +22,13 @@ ImageProcessor::~ImageProcessor()
 
 bool ImageProcessor::loadFromFile(const std::string& filename)
 {
-    // Освобождаем предыдущие данные, если они были загружены
-    stbi_image_free(data_);
-    width_ = 0;
-    height_ = 0;
-    channels_ = 0;
+    if (data_ != nullptr) {
+        // Освобождаем предыдущие данные, если они были загружены
+        stbi_image_free(data_);
+        width_ = 0;
+        height_ = 0;
+        channels_ = 0;
+    }
 
     // STB автоматически определяет формат изображения по расширению файла
     // stbi_load возвращает указатель на данные или nullptr при ошибке

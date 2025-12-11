@@ -90,5 +90,5 @@ private:
     int height_ = 0; // Высота изображения
     int channels_ = 0; // Количество каналов (3 для RGB)
 
-    uint8_t* data_; // Данные изображения (RGB формат)
+    uint8_t* data_ = nullptr; // Данные изображения (RGB формат)
 };

@@ -474,7 +474,7 @@ def main():
 Примеры использования:
   poetry run benchmark
   poetry run benchmark --iterations 5
-  poetry run benchmark --executable ../cmake-build-debug/bin/ImageFilter.exe
+  poetry run benchmark --executable ../cmake-build-debug/bin/ImageFilter
   poetry run benchmark --dataset dataset --output benchmark_output
         """
     )
