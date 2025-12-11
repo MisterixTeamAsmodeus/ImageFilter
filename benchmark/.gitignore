@@ -29,6 +29,8 @@ ENV/
 # Poetry
 poetry.lock
 
+output/
+
 # IDE
 .vscode/
 .idea/

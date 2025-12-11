@@ -1,29 +1,16 @@
 # Бенчмарк тесты для ImageFilter
 
-Этот подпроект содержит инструменты для измерения производительности фильтров изображений.
+Этот подпроект содержит инструменты для измерения производительности наложения фильтров на изображений.
 
 ## Установка
 
 ### Требования
 
 - Python 3.7+
-- Poetry (для управления зависимостями) - опционально, можно использовать pip
+- Poetry или pip
 
 ### Быстрая установка
-
-**Вариант 1: Автоматическая установка (рекомендуется)**
-
-```powershell
-cd benchmark
-.\install.ps1
-```
-
-Скрипт автоматически:
-- Проверит наличие Python
-- Установит Poetry (если нужно)
-- Установит все зависимости
-
-**Вариант 2: Установка через Poetry**
+**Вариант 1: Установка через Poetry**
 
 Если Poetry уже установлен:
 
@@ -32,27 +19,10 @@ cd benchmark
 poetry install
 ```
 
-**Вариант 3: Установка через pip (без Poetry)**
+**Вариант 2: Установка через pip**
 
 ```bash
-cd benchmark
-python -m venv venv
-.\venv\Scripts\Activate.ps1  # Windows PowerShell
 pip install -r requirements.txt
-```
-
-### Установка Poetry
-
-Если Poetry еще не установлен, см. подробные инструкции в [INSTALL.md](INSTALL.md)
-
-Кратко:
-
-```powershell
-# Windows (PowerShell)
-(Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | python -
-
-# Или через pip
-pip install poetry
 ```
 
 После установки перезапустите терминал или добавьте Poetry в PATH.
@@ -94,7 +64,6 @@ poetry run benchmark
 
 **Без Poetry (с виртуальным окружением):**
 ```bash
-.\venv\Scripts\Activate.ps1  # Активация виртуального окружения
 python -m benchmark.benchmark
 ```
 
@@ -103,7 +72,7 @@ python -m benchmark.benchmark
 **С Poetry:**
 ```bash
 # Указать путь к исполняемому файлу (относительно корня проекта)
-poetry run benchmark --executable ../cmake-build-debug/bin/ImageFilter.exe
+poetry run benchmark --executable ../cmake-build-debug/bin/ImageFilter
 
 # Изменить количество итераций (по умолчанию 3)
 poetry run benchmark --iterations 5
@@ -120,7 +89,7 @@ poetry run benchmark --pattern "*.png"
 
 **Без Poetry:**
 ```bash
-python -m benchmark.benchmark --executable ../cmake-build-debug/bin/ImageFilter.exe
+python -m benchmark.benchmark --executable ../cmake-build-debug/bin/ImageFilter
 python -m benchmark.benchmark --iterations 5
 # и т.д.
 ```
@@ -130,7 +99,7 @@ python -m benchmark.benchmark --iterations 5
 **С Poetry:**
 ```bash
 poetry run benchmark \
-    --executable ../cmake-build-debug/bin/ImageFilter.exe \
+    --executable ../cmake-build-debug/bin/ImageFilter \
     --dataset dataset \
     --output benchmark_output \
     --iterations 5 \
@@ -140,7 +109,7 @@ poetry run benchmark \
 **Без Poetry:**
 ```bash
 python -m benchmark.benchmark \
-    --executable ../cmake-build-debug/bin/ImageFilter.exe \
+    --executable ../cmake-build-debug/bin/ImageFilter \
     --dataset dataset \
     --output benchmark_output \
     --iterations 5 \
@@ -236,44 +205,6 @@ poetry shell
 ```bash
 python -m benchmark.benchmark
 python -m benchmark.generate_test_images
-```
-
-### Установка зависимостей для разработки
-
-```bash
-poetry install --with dev
-```
-
-Это установит дополнительные инструменты:
-- `black` - форматирование кода
-- `ruff` - линтер
-- `mypy` - проверка типов
-
-### Форматирование кода
-
-```bash
-poetry run black benchmark
-```
-
-### Проверка кода
-
-```bash
-poetry run ruff check benchmark
-poetry run mypy benchmark
-```
-
-## Структура проекта
-
-```
-benchmark/
-├── pyproject.toml              # Конфигурация Poetry
-├── README.md                   # Этот файл
-├── imagefilter_benchmark/      # Основной пакет
-│   ├── __init__.py
-│   ├── benchmark.py            # Основной модуль бенчмарка
-│   └── generate_test_images.py # Генератор тестовых изображений
-├── dataset/                    # Тестовые изображения (создается автоматически)
-└── benchmark_output/            # Результаты бенчмарка (создается автоматически)
 ```
 
 ## Примечания
