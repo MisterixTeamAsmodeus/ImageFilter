@@ -25,6 +25,7 @@ public:
     std::string getName() const override;
     std::string getDescription() const override;
     std::string getCategory() const override;
+    bool supportsInPlace() const noexcept override;
 };
 
 

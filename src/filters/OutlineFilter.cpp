@@ -3,6 +3,7 @@
 #include <utils/ParallelImageProcessor.h>
 #include <utils/FilterResult.h>
 #include <utils/BorderHandler.h>
+#include <utils/ColorConversionUtils.h>
 #include <vector>
 
 FilterResult OutlineFilter::apply(ImageProcessor& image)
@@ -44,16 +45,13 @@ FilterResult OutlineFilter::apply(ImageProcessor& image)
     {
         for (int x = 0; x < width; ++x)
         {
-            constexpr int R_COEFF = 19595;
-            constexpr int G_COEFF = 38470;
-            constexpr int B_COEFF = 7471;
-
             const auto pixel_offset = (static_cast<size_t>(y) * static_cast<size_t>(width) + static_cast<size_t>(x)) * static_cast<size_t>(channels);
             const auto r = static_cast<int>(input_data[pixel_offset + 0]);
             const auto g = static_cast<int>(input_data[pixel_offset + 1]);
             const auto b = static_cast<int>(input_data[pixel_offset + 2]);
-            grayscale[static_cast<size_t>(y) * static_cast<size_t>(width) + static_cast<size_t>(x)] = static_cast<uint8_t>((R_COEFF * r + G_COEFF * g + B_COEFF *
-                b) >> 16);
+            // Используем общую утилиту для преобразования RGB в градации серого
+            grayscale[static_cast<size_t>(y) * static_cast<size_t>(width) + static_cast<size_t>(x)] = 
+                ColorConversionUtils::rgbToGrayscale(r, g, b);
         }
     }
     std::vector<int> laplacian_result(static_cast<size_t>(width) * static_cast<size_t>(height));

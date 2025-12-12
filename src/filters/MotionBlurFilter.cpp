@@ -2,56 +2,63 @@
 #include <ImageProcessor.h>
 #include <utils/ParallelImageProcessor.h>
 #include <utils/FilterResult.h>
+#include <utils/FilterValidator.h>
+#include <utils/FilterValidationHelper.h>
 #include <utils/BorderHandler.h>
 #include <utils/LookupTables.h>
+#include <utils/IBufferPool.h>
+#include <utils/SafeMath.h>
 #include <algorithm>
 #include <vector>
 #include <numbers>
 
 FilterResult MotionBlurFilter::apply(ImageProcessor& image)
 {
-    if (!image.isValid())
-    {
-        return FilterResult::failure(FilterError::InvalidImage, "Изображение не загружено");
-    }
-
     const auto width = image.getWidth();
     const auto height = image.getHeight();
     const auto channels = image.getChannels();
 
-    // Валидация размеров изображения
-    if (width <= 0 || height <= 0)
-    {
-        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
-        ctx.filter_params = "length=" + std::to_string(length_) + ", angle=" + std::to_string(angle_);
-        return FilterResult::failure(FilterError::InvalidSize,
-                                     "Размер изображения должен быть больше нуля", ctx);
-    }
-
-    if (channels != 3 && channels != 4)
-    {
-        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
-        ctx.filter_params = "length=" + std::to_string(length_) + ", angle=" + std::to_string(angle_);
-        return FilterResult::failure(FilterError::InvalidChannels, 
-                                     "Ожидается 3 канала (RGB) или 4 канала (RGBA), получено: " + std::to_string(channels),
-                                     ctx);
-    }
-    
     // Валидация параметров фильтра
+    FilterResult length_result = FilterResult::success();
     if (length_ <= 0)
     {
         ErrorContext ctx = ErrorContext::withImage(width, height, channels);
-        ctx.filter_params = "length=" + std::to_string(length_) + ", angle=" + std::to_string(angle_);
-        return FilterResult::failure(FilterError::InvalidParameter, 
+        ctx.withFilterParam("length", length_).withFilterParam("angle", angle_);
+        length_result = FilterResult::failure(FilterError::InvalidParameter, 
                                      "Длина размытия должна быть > 0, получено: " + std::to_string(length_),
                                      ctx);
     }
+    
+    // Валидация изображения и параметра с автоматическим добавлением контекста
+    auto validation_result = FilterValidationHelper::validateImageAndParam(
+        image, length_result, "length", length_);
+    if (validation_result.hasError())
+    {
+        return validation_result;
+    }
 
     const auto* input_data = image.getData();
-    const auto buffer_size = static_cast<size_t>(width) * static_cast<size_t>(height) * static_cast<size_t>(channels);
+    size_t width_height_product = 0;
+    size_t buffer_size = 0;
+    if (!SafeMath::safeMultiply(static_cast<size_t>(width), static_cast<size_t>(height), width_height_product) ||
+        !SafeMath::safeMultiply(width_height_product, static_cast<size_t>(channels), buffer_size))
+    {
+        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
+        ctx.withFilterParam("length", length_).withFilterParam("angle", angle_);
+        return FilterResult::failure(FilterError::ArithmeticOverflow, 
+                                   "Размер изображения слишком большой", ctx);
+    }
     
-    // Создаем буфер для результата
-    std::vector<uint8_t> result(buffer_size);
+    // Получаем буфер из пула или создаем новый
+    std::vector<uint8_t> result;
+    if (buffer_pool_ != nullptr)
+    {
+        result = buffer_pool_->acquire(buffer_size);
+    }
+    else
+    {
+        result.resize(buffer_size);
+    }
 
     // Инициализируем lookup tables
     LookupTables::initialize();
@@ -110,6 +117,12 @@ FilterResult MotionBlurFilter::apply(ImageProcessor& image)
     // Копируем результат обратно
     auto* data = image.getData();
     std::ranges::copy(result, data);
+
+    // Возвращаем буфер в пул для переиспользования
+    if (buffer_pool_ != nullptr)
+    {
+        buffer_pool_->release(std::move(result));
+    }
 
     return FilterResult::success();
 }

@@ -968,7 +968,7 @@ def main():
     parser.add_argument(
         "--all-combinations",
         action="store_true",
-        help="Запустить бенчмарк для всех возможных комбинаций фильтров с учетом порядка"
+        help="Запустить бенчмарк для всех возможных комбинаций фильтров (порядок не важен)"
     )
     
     parser.add_argument(
@@ -1029,7 +1029,7 @@ def main():
                 image_pattern=args.pattern
             )
         else:
-            raise ValueError("Необходимо указать хотя бы один из режимов работы: --chains, --both, --all-combinations")
+            raise ValueError("Необходимо указать один из режимов работы: --chains, --both, --all-combinations")
         
         benchmark.print_statistics()
         benchmark.save_statistics_csv()

@@ -41,7 +41,7 @@ output/
 # Benchmark outputs
 dataset/
 dataset_all
-benchmark_output/
+benchmark_output*/
 *.jpg
 *.png
 

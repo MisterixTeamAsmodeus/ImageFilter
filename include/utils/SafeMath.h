@@ -107,6 +107,44 @@ namespace SafeMath
     }
 
     /**
+     * @brief Безопасное вычитание с проверкой переполнения
+     * 
+     * @param a Уменьшаемое
+     * @param b Вычитаемое
+     * @param result Результат вычитания (выходной параметр)
+     * @return true если вычитание успешно, false при переполнении
+     */
+    template<typename T>
+    bool safeSubtract(T a, T b, T& result)
+    {
+        static_assert(std::is_integral_v<T>, "T must be an integral type");
+        
+        if (std::is_signed_v<T>)
+        {
+            // Проверка на переполнение для знаковых типов
+            if (b > 0 && a < std::numeric_limits<T>::min() + b)
+            {
+                return false; // Переполнение
+            }
+            if (b < 0 && a > std::numeric_limits<T>::max() + b)
+            {
+                return false; // Переполнение
+            }
+        }
+        else
+        {
+            // Проверка на переполнение для беззнаковых типов
+            if (a < b)
+            {
+                return false; // Переполнение (результат был бы отрицательным)
+            }
+        }
+        
+        result = a - b;
+        return true;
+    }
+
+    /**
      * @brief Ограничивает значение диапазоном [min_val, max_val]
      * 
      * @param value Значение для ограничения

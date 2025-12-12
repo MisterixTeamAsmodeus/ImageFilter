@@ -2,42 +2,27 @@
 #include <ImageProcessor.h>
 #include <utils/ParallelImageProcessor.h>
 #include <utils/FilterResult.h>
+#include <utils/FilterValidator.h>
+#include <utils/FilterValidationHelper.h>
+#include <utils/PixelOffsetUtils.h>
+#include <utils/SafeMath.h>
 #include <algorithm>
 
 FilterResult ContrastFilter::apply(ImageProcessor& image) {
-    if (!image.isValid()) {
-        return FilterResult::failure(FilterError::InvalidImage, "Изображение не загружено");
+    // Валидация параметра фильтра
+    auto factor_result = FilterValidator::validateFactor(factor_);
+    
+    // Валидация изображения и параметра с автоматическим добавлением контекста
+    auto validation_result = FilterValidationHelper::validateImageAndParam(
+        image, factor_result, "factor", factor_);
+    if (validation_result.hasError())
+    {
+        return validation_result;
     }
 
     const auto width = image.getWidth();
     const auto height = image.getHeight();
     const auto channels = image.getChannels();
-
-    // Валидация размеров изображения
-    if (width <= 0 || height <= 0) {
-        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
-        ctx.filter_params = "factor=" + std::to_string(factor_);
-        return FilterResult::failure(FilterError::InvalidSize,
-                                     "Размер изображения должен быть больше нуля", ctx);
-    }
-
-    if (channels != 3 && channels != 4) {
-        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
-        ctx.filter_params = "factor=" + std::to_string(factor_);
-        return FilterResult::failure(FilterError::InvalidChannels, 
-                                     "Ожидается 3 канала (RGB) или 4 канала (RGBA), получено: " + std::to_string(channels),
-                                     ctx);
-    }
-
-    // Валидация параметра фильтра
-    if (factor_ <= 0.0) {
-        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
-        ctx.filter_params = "factor=" + std::to_string(factor_);
-        return FilterResult::failure(FilterError::InvalidFactor,
-                                     "Коэффициент контрастности должен быть больше нуля, получено: " + std::to_string(factor_),
-                                     ctx);
-    }
-
     auto* data = image.getData();
     const auto factor = static_cast<int>(factor_ * 65536);  // Масштабируем для целочисленной арифметики
     constexpr int MIDDLE = 128;
@@ -47,18 +32,59 @@ FilterResult ContrastFilter::apply(ImageProcessor& image) {
         height,
         [width, channels, data, factor](int start_row, int end_row) {
             for (int y = start_row; y < end_row; ++y) {
-                const auto row_offset = static_cast<size_t>(y) * static_cast<size_t>(width) * static_cast<size_t>(channels);
+                // Вычисляем смещение строки с защитой от переполнения
+                size_t row_offset = 0;
+                if (!PixelOffsetUtils::computeRowOffset(y, width, channels, row_offset))
+                {
+                    // Пропускаем строку при переполнении
+                    continue;
+                }
                 
                 for (int x = 0; x < width; ++x) {
-                    const auto pixel_offset = row_offset + static_cast<size_t>(x) * static_cast<size_t>(channels);
+                    // Вычисляем смещение пикселя с защитой от переполнения
+                    size_t pixel_offset = 0;
+                    if (!PixelOffsetUtils::computePixelOffset(row_offset, x, channels, pixel_offset))
+                    {
+                        // Пропускаем пиксель при переполнении
+                        continue;
+                    }
                     
                     // Применяем контраст только к цветовым каналам (RGB)
                     // Альфа-канал сохраняется без изменений
                     for (int c = 0; c < color_channels; ++c) {
-                        const auto old_value = static_cast<int>(data[pixel_offset + static_cast<size_t>(c)]);
+                        size_t channel_offset = 0;
+                        if (!PixelOffsetUtils::computeChannelOffset(pixel_offset, c, channel_offset))
+                        {
+                            continue; // Пропускаем при переполнении
+                        }
+                        
+                        // Проверка границ
+                        const size_t row_end = row_offset + static_cast<size_t>(width) * static_cast<size_t>(channels);
+                        if (channel_offset >= row_end)
+                        {
+                            continue; // Защита от выхода за границы
+                        }
+                        
+                        const auto old_value = static_cast<int>(data[channel_offset]);
                         const auto diff = old_value - MIDDLE;
-                        const auto new_value = ((diff * factor) >> 16) + MIDDLE;
-                        data[pixel_offset + static_cast<size_t>(c)] = static_cast<uint8_t>(std::max(0, std::min(255, new_value)));
+                        // Вычисляем новое значение с проверкой на переполнение
+                        // factor уже масштабирован на 65536, поэтому используем int64_t для промежуточных вычислений
+                        const int64_t diff_64 = static_cast<int64_t>(diff);
+                        const int64_t factor_64 = static_cast<int64_t>(factor);
+                        int64_t diff_factor = diff_64 * factor_64;
+                        // Проверка на переполнение (приблизительная)
+                        constexpr int64_t max_safe = (static_cast<int64_t>(INT_MAX) << 16);
+                        constexpr int64_t min_safe = (static_cast<int64_t>(INT_MIN) << 16);
+                        if (diff_factor > max_safe)
+                        {
+                            diff_factor = max_safe;
+                        }
+                        else if (diff_factor < min_safe)
+                        {
+                            diff_factor = min_safe;
+                        }
+                        const auto new_value = static_cast<int>((diff_factor >> 16) + MIDDLE);
+                        data[channel_offset] = static_cast<uint8_t>(std::max(0, std::min(255, new_value)));
                     }
                     // Альфа-канал (pixel_offset + 3) не изменяется, если channels == 4
                 }
@@ -82,6 +108,11 @@ std::string ContrastFilter::getDescription() const
 std::string ContrastFilter::getCategory() const
 {
     return "Цветовой";
+}
+
+bool ContrastFilter::supportsInPlace() const noexcept
+{
+    return true;
 }
 
 

@@ -2,47 +2,26 @@
 #include <ImageProcessor.h>
 #include <utils/ParallelImageProcessor.h>
 #include <utils/FilterResult.h>
+#include <utils/FilterValidator.h>
+#include <utils/FilterValidationHelper.h>
 #include <algorithm>
 
 FilterResult BrightnessFilter::apply(ImageProcessor& image)
 {
-    if (!image.isValid())
+    // Валидация параметра фильтра
+    auto factor_result = FilterValidator::validateFactor(factor_, 0.0);
+    
+    // Валидация изображения и параметра с автоматическим добавлением контекста
+    auto validation_result = FilterValidationHelper::validateImageAndParam(
+        image, factor_result, "factor", factor_);
+    if (validation_result.hasError())
     {
-        return FilterResult::failure(FilterError::InvalidImage, "Изображение не загружено");
+        return validation_result;
     }
 
     const auto width = image.getWidth();
     const auto height = image.getHeight();
     const auto channels = image.getChannels();
-
-    // Валидация размеров изображения
-    if (width <= 0 || height <= 0)
-    {
-        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
-        ctx.filter_params = "factor=" + std::to_string(factor_);
-        return FilterResult::failure(FilterError::InvalidSize, 
-                                     "Размер изображения должен быть больше нуля", ctx);
-    }
-
-    if (channels != 3 && channels != 4)
-    {
-        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
-        ctx.filter_params = "factor=" + std::to_string(factor_);
-        return FilterResult::failure(FilterError::InvalidChannels, 
-                                     "Ожидается 3 канала (RGB) или 4 канала (RGBA), получено: " + std::to_string(channels),
-                                     ctx);
-    }
-
-    // Валидация параметра фильтра
-    if (factor_ <= 0.0)
-    {
-        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
-        ctx.filter_params = "factor=" + std::to_string(factor_);
-        return FilterResult::failure(FilterError::InvalidFactor,
-                                     "Коэффициент яркости должен быть больше нуля, получено: " + std::to_string(factor_),
-                                     ctx);
-    }
-
     auto* data = image.getData();
     const auto factor = static_cast<int>(factor_ * 65536); // Масштабируем для целочисленной арифметики
     constexpr int color_channels = 3; // Обрабатываем только RGB каналы
@@ -89,6 +68,11 @@ std::string BrightnessFilter::getDescription() const
 std::string BrightnessFilter::getCategory() const
 {
     return "Цветовой";
+}
+
+bool BrightnessFilter::supportsInPlace() const noexcept
+{
+    return true;
 }
 
 

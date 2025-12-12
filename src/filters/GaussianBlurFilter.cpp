@@ -4,37 +4,19 @@
 #include <utils/FilterResult.h>
 #include <utils/BorderHandler.h>
 #include <utils/LookupTables.h>
+#include <utils/IBufferPool.h>
+#include <utils/CacheManager.h>
+#include <utils/SafeMath.h>
+#include <utils/FilterValidator.h>
+#include <utils/FilterValidationHelper.h>
 #include <algorithm>
 #include <vector>
-#include <unordered_map>
-#include <shared_mutex>
 #include <numbers>  // C++20: для std::numbers::pi
 
 // Масштаб для целочисленной арифметики (16 бит для точности)
 constexpr int32_t KERNEL_SCALE = 65536;
 
 namespace {
-    /**
-     * @brief Получает thread-safe кэш для ядер Гаусса
-     * Использует локальную статическую переменную для избежания exit-time destructors
-     * @return Ссылка на кэш ядер
-     */
-    std::unordered_map<double, std::vector<int32_t>>& getKernelCache()
-    {
-        static std::unordered_map<double, std::vector<int32_t>> cache;
-        return cache;
-    }
-
-    /**
-     * @brief Получает мьютекс для синхронизации доступа к кэшу
-     * Использует локальную статическую переменную для избежания exit-time destructors
-     * @return Ссылка на мьютекс кэша
-     */
-    std::shared_mutex& getCacheMutex()
-    {
-        static std::shared_mutex mutex;
-        return mutex;
-    }
 
     /**
      * @brief Генерирует одномерное ядро Гаусса в целочисленном формате
@@ -104,39 +86,17 @@ namespace {
      */
     std::vector<int32_t> getOrGenerateKernel(const double radius, const double& sigma)
     {
-        auto& kernel_cache = getKernelCache();
-        auto& cache_mutex = getCacheMutex();
-
-        // Пытаемся получить ядро из кэша (shared lock для чтения)
-        {
-            std::shared_lock<std::shared_mutex> lock(cache_mutex);
-            const auto it = kernel_cache.find(radius);
-            if (it != kernel_cache.end())
-            {
-                return it->second;  // Возвращаем копию из кэша
-            }
-        }
-
-        // Ядро не найдено в кэше, генерируем новое
-        auto kernel = generateKernel(radius, sigma);
-        normalizeKernel(kernel);
-
-        // Сохраняем в кэш (exclusive lock для записи)
-        {
-            std::unique_lock<std::shared_mutex> lock(cache_mutex);
-            // Проверяем еще раз на случай, если другой поток уже добавил ядро
-            if (kernel_cache.find(radius) == kernel_cache.end())
-            {
-                kernel_cache[radius] = kernel;
-            }
-            else
-            {
-                // Используем уже существующее ядро из кэша
-                kernel = kernel_cache[radius];
-            }
-        }
-
-        return kernel;
+        KernelCacheKey key;
+        key.type = KernelCacheKey::Type::Gaussian;
+        key.radius = radius;
+        key.sigma = sigma;
+        
+        auto& cache_manager = CacheManager::getInstance();
+        return cache_manager.getOrGenerateKernel(key, [radius, sigma]() {
+            auto kernel = generateKernel(radius, sigma);
+            normalizeKernel(kernel);
+            return kernel;
+        });
     }
 
     /**
@@ -144,12 +104,14 @@ namespace {
      * @param image Исходное изображение
      * @param kernel Ядро для применения (целочисленное, масштабированное)
      * @param border_handler Обработчик границ
+     * @param buffer_pool Пул буферов для переиспользования (может быть nullptr)
      * @return Вектор с промежуточными результатами
      */
     std::vector<uint8_t> applyHorizontalKernel(
         const ImageProcessor& image,
         const std::vector<int32_t>& kernel,
-        const BorderHandler& border_handler
+        const BorderHandler& border_handler,
+        IBufferPool* buffer_pool
     )
     {
         const auto width = image.getWidth();
@@ -159,10 +121,25 @@ namespace {
         const auto kernel_radius = kernel_size / 2;
 
         const auto* input_data = image.getData();
-        const auto buffer_size = static_cast<size_t>(width) * static_cast<size_t>(height) * static_cast<size_t>(channels);
+        size_t width_height_product = 0;
+        size_t buffer_size = 0;
+        if (!SafeMath::safeMultiply(static_cast<size_t>(width), static_cast<size_t>(height), width_height_product) ||
+            !SafeMath::safeMultiply(width_height_product, static_cast<size_t>(channels), buffer_size))
+        {
+            // Возвращаем пустой вектор при переполнении
+            return std::vector<uint8_t>();
+        }
         
-        // Создаем буфер для результата
-        std::vector<uint8_t> result(buffer_size);
+        // Получаем буфер из пула или создаем новый
+        std::vector<uint8_t> result;
+        if (buffer_pool != nullptr)
+        {
+            result = buffer_pool->acquire(buffer_size);
+        }
+        else
+        {
+            result.resize(buffer_size);
+        }
 
         // Параллельная обработка строк изображения
         ParallelImageProcessor::processRowsParallel(
@@ -233,13 +210,15 @@ namespace {
      * @param image Исходное изображение (для получения размеров)
      * @param kernel Ядро для применения (целочисленное, масштабированное)
      * @param border_handler Обработчик границ
+     * @param buffer_pool Пул буферов для переиспользования (может быть nullptr)
      * @return Финальный результат размытия
      */
     std::vector<uint8_t> applyVerticalKernel(
         const std::vector<uint8_t>& horizontalResult,
         const ImageProcessor& image,
         const std::vector<int32_t>& kernel,
-        const BorderHandler& border_handler
+        const BorderHandler& border_handler,
+        IBufferPool* buffer_pool
     )
     {
         const auto width = image.getWidth();
@@ -248,10 +227,25 @@ namespace {
         const auto kernel_size = static_cast<int>(kernel.size());
         const auto kernel_radius = kernel_size / 2;
 
-        const auto buffer_size = static_cast<size_t>(width) * static_cast<size_t>(height) * static_cast<size_t>(channels);
+        size_t width_height_product = 0;
+        size_t buffer_size = 0;
+        if (!SafeMath::safeMultiply(static_cast<size_t>(width), static_cast<size_t>(height), width_height_product) ||
+            !SafeMath::safeMultiply(width_height_product, static_cast<size_t>(channels), buffer_size))
+        {
+            // Возвращаем пустой вектор при переполнении
+            return std::vector<uint8_t>();
+        }
         
-        // Создаем буфер для результата
-        std::vector<uint8_t> result(buffer_size);
+        // Получаем буфер из пула или создаем новый
+        std::vector<uint8_t> result;
+        if (buffer_pool != nullptr)
+        {
+            result = buffer_pool->acquire(buffer_size);
+        }
+        else
+        {
+            result.resize(buffer_size);
+        }
 
         // Параллельная обработка строк изображения
         ParallelImageProcessor::processRowsParallel(
@@ -320,41 +314,19 @@ namespace {
 
 FilterResult GaussianBlurFilter::apply(ImageProcessor& image)
 {
-    if (!image.isValid())
-    {
-        return FilterResult::failure(FilterError::InvalidImage, "Изображение не загружено");
-    }
-
     const auto width = image.getWidth();
     const auto height = image.getHeight();
     const auto channels = image.getChannels();
 
-    // Валидация размеров изображения
-    if (width <= 0 || height <= 0)
+    // Валидация параметра фильтра (радиус должен быть > 0 для Gaussian blur)
+    auto radius_result = FilterValidator::validateRadius(radius_, 0.001, 1000.0, width, height);
+    
+    // Валидация изображения и параметра с автоматическим добавлением контекста
+    auto validation_result = FilterValidationHelper::validateImageAndParam(
+        image, radius_result, "radius", radius_);
+    if (validation_result.hasError())
     {
-        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
-        ctx.filter_params = "radius=" + std::to_string(radius_);
-        return FilterResult::failure(FilterError::InvalidSize,
-                                     "Размер изображения должен быть больше нуля", ctx);
-    }
-
-    if (channels != 3 && channels != 4)
-    {
-        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
-        ctx.filter_params = "radius=" + std::to_string(radius_);
-        return FilterResult::failure(FilterError::InvalidChannels, 
-                                     "Ожидается 3 канала (RGB) или 4 канала (RGBA), получено: " + std::to_string(channels),
-                                     ctx);
-    }
-
-    // Валидация параметра фильтра
-    if (radius_ <= 0.0)
-    {
-        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
-        ctx.filter_params = "radius=" + std::to_string(radius_);
-        return FilterResult::failure(FilterError::InvalidRadius,
-                                     "Радиус должен быть больше нуля, получено: " + std::to_string(radius_),
-                                     ctx);
+        return validation_result;
     }
 
     // Вычисляем стандартное отклонение (sigma) из радиуса
@@ -366,17 +338,20 @@ FilterResult GaussianBlurFilter::apply(ImageProcessor& image)
 
     // Применяем separable kernel: сначала по горизонтали, затем по вертикали
     // Это оптимизация: вместо O(N²) операций на пиксель получаем O(2N)
-    // Примечание: applyHorizontalKernel и applyVerticalKernel создают свои локальные пулы
     
-    auto horizontal_result = applyHorizontalKernel(image, kernel, border_handler_);
-    auto final_result = applyVerticalKernel(horizontal_result, image, kernel, border_handler_);
+    auto horizontal_result = applyHorizontalKernel(image, kernel, border_handler_, buffer_pool_);
+    auto final_result = applyVerticalKernel(horizontal_result, image, kernel, border_handler_, buffer_pool_);
 
     // Копируем результат обратно в изображение
     auto* data = image.getData();
     std::ranges::copy(final_result, data);
 
-    // Буферы автоматически освобождаются при выходе из области видимости
-    // (applyHorizontalKernel и applyVerticalKernel создают свои локальные пулы)
+    // Возвращаем буферы в пул для переиспользования
+    if (buffer_pool_ != nullptr)
+    {
+        buffer_pool_->release(std::move(horizontal_result));
+        buffer_pool_->release(std::move(final_result));
+    }
 
     return FilterResult::success();
 }

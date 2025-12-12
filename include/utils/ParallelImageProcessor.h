@@ -30,6 +30,17 @@ class IThreadPool;
  *   - Маленькие изображения (< 100x100): последовательная обработка
  *   - Средние изображения: параллельная обработка с меньшим количеством потоков
  *   - Большие изображения: параллельная обработка со всеми доступными потоками
+ * 
+ * @example example_parallel_processing.cpp
+ * Пример использования параллельной обработки:
+ * @code{.cpp}
+ * ParallelImageProcessor::processRowsParallel(
+ *     height, width,
+ *     [&](int start_row, int end_row) {
+ *         // Обработка диапазона строк
+ *     }
+ * );
+ * @endcode
  */
 class ParallelImageProcessor
 {

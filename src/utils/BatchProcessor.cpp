@@ -1,80 +1,16 @@
 #include <utils/BatchProcessor.h>
+#include <utils/FileSystemHelper.h>
+#include <utils/ResumeStateManager.h>
+#include <utils/FilterResult.h>
 #include <utils/Logger.h>
+#include <utils/IThreadPool.h>
+#include <utils/ThreadPool.h>
 
 #include <filesystem>
-#include <algorithm>
-#include <cctype>
-
-namespace
-{
-    /**
-     * @brief Преобразует строку в нижний регистр
-     */
-    std::string toLower(const std::string& str)
-    {
-        std::string result = str;
-        std::transform(result.begin(), result.end(), result.begin(),
-                      [](unsigned char c) { return std::tolower(c); });
-        return result;
-    }
-
-    /**
-     * @brief Проверяет расширение файла
-     */
-    bool hasExtension(const std::filesystem::path& path, const std::vector<std::string>& extensions)
-    {
-        if (!path.has_extension())
-        {
-            return false;
-        }
-
-        std::string ext = toLower(path.extension().string());
-        // Убираем точку из расширения
-        if (!ext.empty() && ext[0] == '.')
-        {
-            ext = ext.substr(1);
-        }
-
-        for (const auto& valid_ext : extensions)
-        {
-            if (ext == valid_ext)
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * @brief Простой паттерн-матчинг для шаблонов вида "*.jpg"
-     */
-    bool simplePatternMatch(const std::string& filename, const std::string& pattern)
-    {
-        if (pattern.empty())
-        {
-            return true;
-        }
-
-        // Простая поддержка шаблонов вида "*.ext" или "*.EXT"
-        if (pattern.size() >= 2 && pattern[0] == '*' && pattern[1] == '.')
-        {
-            std::string pattern_ext = pattern.substr(2);
-            std::string filename_lower = toLower(filename);
-            std::string pattern_ext_lower = toLower(pattern_ext);
-
-            // Проверяем, заканчивается ли имя файла на расширение из шаблона
-            if (filename_lower.size() >= pattern_ext_lower.size())
-            {
-                std::string file_ext = filename_lower.substr(
-                    filename_lower.size() - pattern_ext_lower.size());
-                return file_ext == pattern_ext_lower;
-            }
-        }
-
-        // Если шаблон не соответствует формату "*.ext", проверяем точное совпадение
-        return toLower(filename) == toLower(pattern);
-    }
-}
+#include <set>
+#include <mutex>
+#include <atomic>
+#include <chrono>
 
 BatchProcessor::BatchProcessor(const std::string& input_dir,
                                const std::string& output_dir,
@@ -89,68 +25,24 @@ BatchProcessor::BatchProcessor(const std::string& input_dir,
 
 std::vector<std::filesystem::path> BatchProcessor::findImages() const
 {
-    std::vector<std::filesystem::path> images;
-    std::filesystem::path input_path(input_dir_);
-
-    if (!std::filesystem::exists(input_path))
-    {
-        Logger::error("Входная директория не существует: " + input_dir_);
-        return images;
-    }
-
-    if (!std::filesystem::is_directory(input_path))
-    {
-        Logger::error("Указанный путь не является директорией: " + input_dir_);
-        return images;
-    }
-
-    if (recursive_)
-    {
-        findImagesRecursive(input_path, images);
-    }
-    else
-    {
-        // Не рекурсивный поиск - только в текущей директории
-        for (const auto& entry : std::filesystem::directory_iterator(input_path))
-        {
-            if (entry.is_regular_file() && isImageFile(entry.path()))
-            {
-                if (pattern_.empty() || matchesPattern(entry.path().filename().string(), pattern_))
-                {
-                    images.push_back(entry.path());
-                }
-            }
-        }
-    }
-
-    return images;
-}
-
-void BatchProcessor::findImagesRecursive(const std::filesystem::path& dir,
-                                        std::vector<std::filesystem::path>& images) const
-{
-    try
-    {
-        for (const auto& entry : std::filesystem::recursive_directory_iterator(dir))
-        {
-            if (entry.is_regular_file() && isImageFile(entry.path()))
-            {
-                if (pattern_.empty() || matchesPattern(entry.path().filename().string(), pattern_))
-                {
-                    images.push_back(entry.path());
-                }
-            }
-        }
-    }
-    catch (const std::filesystem::filesystem_error& e)
-    {
-        Logger::error("Ошибка при обходе директории: " + std::string(e.what()));
-    }
+    return FileSystemHelper::findImages(input_dir_, recursive_, pattern_);
 }
 
 BatchStatistics BatchProcessor::processAll(
-    const std::function<bool(const std::string&, const std::string&)>& process_function,
-    ProgressCallback progress_callback) const
+    const std::function<FilterResult(const std::string&, const std::string&)>& process_function,
+    ProgressCallback progress_callback,
+    IThreadPool* thread_pool,
+    int max_parallel) const
+{
+    return processAllWithResume(process_function, progress_callback, "", thread_pool, max_parallel);
+}
+
+BatchStatistics BatchProcessor::processAllWithResume(
+    const std::function<FilterResult(const std::string&, const std::string&)>& process_function,
+    ProgressCallback progress_callback,
+    const std::string& resume_state_file,
+    IThreadPool* thread_pool,
+    int max_parallel) const
 {
     BatchStatistics stats{};
     auto images = findImages();
@@ -176,63 +68,241 @@ BatchStatistics BatchProcessor::processAll(
         return stats;
     }
 
-    // Обрабатываем каждый файл
-    for (size_t i = 0; i < images.size(); ++i)
+    // Загружаем состояние возобновления, если указан файл
+    std::set<std::string> processed_files;
+    if (!resume_state_file.empty())
     {
-        const auto& input_file = images[i];
-        std::string input_file_str = input_file.string();
-
-        // Вызываем callback для отображения прогресса
-        if (progress_callback)
+        processed_files = ResumeStateManager::loadResumeState(resume_state_file);
+        if (!processed_files.empty())
         {
-            progress_callback(i + 1, stats.total_files, input_file_str);
+            Logger::info("Загружено состояние возобновления: " + std::to_string(processed_files.size()) + " файлов уже обработано");
         }
+    }
+
+    // Определяем количество параллельных потоков
+    bool use_parallel = (thread_pool != nullptr);
+    int num_parallel = 1;
+    if (use_parallel)
+    {
+        if (max_parallel > 0)
+        {
+            num_parallel = max_parallel;
+        }
+        else
+        {
+            num_parallel = thread_pool->getThreadCount();
+        }
+    }
+
+    // Время начала обработки
+    const auto start_time = std::chrono::steady_clock::now();
+    std::atomic<size_t> processed_count{0};  // Счетчик всех проверенных файлов
+
+    // Мьютекс для синхронизации доступа к статистике и состоянию
+    std::mutex stats_mutex;
+    std::set<std::string> processed_in_session;
+
+    // Функция обработки одного файла
+    auto process_single_file = [&](size_t /*index*/, const std::filesystem::path& input_file) {
+        std::string input_file_str = input_file.string();
 
         // Определяем выходной путь
         std::filesystem::path output_file;
         if (recursive_)
         {
-            // Сохраняем структуру директорий
             std::filesystem::path input_path(input_dir_);
-            std::filesystem::path relative = getRelativePath(input_file, input_path);
+            std::filesystem::path relative = FileSystemHelper::getRelativePath(input_file, input_path);
             output_file = output_path / relative;
         }
         else
         {
-            // Просто копируем имя файла
             output_file = output_path / input_file.filename();
-        }
-
-        // Создаем выходную директорию для файла, если нужно
-        if (!ensureOutputDirectory(output_file))
-        {
-            Logger::error("Не удалось создать директорию для: " + output_file.string());
-            stats.failed_files++;
-            continue;
         }
 
         std::string output_file_str = output_file.string();
 
+        // Проверяем, не обработан ли уже файл
+        bool should_skip = false;
+        {
+            std::lock_guard<std::mutex> lock(stats_mutex);
+            if (processed_files.find(output_file_str) != processed_files.end() ||
+                ResumeStateManager::isFileProcessed(output_file))
+            {
+                stats.skipped_files++;
+                should_skip = true;
+            }
+        }
+
+        if (should_skip)
+        {
+            // Обновляем счетчик и прогресс для пропущенных файлов
+            size_t current = ++processed_count;
+            if (progress_callback)
+            {
+                const auto current_time = std::chrono::steady_clock::now();
+                const auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(
+                    current_time - start_time);
+                
+                double percentage = (static_cast<double>(current) / static_cast<double>(stats.total_files)) * 100.0;
+                
+                double files_per_second = 0.0;
+                std::chrono::seconds estimated_remaining(0);
+                if (elapsed.count() > 0 && current > 0)
+                {
+                    files_per_second = static_cast<double>(current) / elapsed.count();
+                    if (files_per_second > 0.0)
+                    {
+                        const size_t remaining = stats.total_files - current;
+                        estimated_remaining = std::chrono::seconds(
+                            static_cast<long long>(remaining / files_per_second));
+                    }
+                }
+
+                ProgressInfo info;
+                info.current = current;
+                info.total = stats.total_files;
+                info.current_file = input_file_str;
+                info.percentage = percentage;
+                info.elapsed_time = elapsed;
+                info.estimated_remaining = estimated_remaining;
+                info.files_per_second = files_per_second;
+
+                progress_callback(info);
+            }
+            return;
+        }
+
+        // Создаем выходную директорию для файла, если нужно
+        if (!FileSystemHelper::ensureOutputDirectory(output_file))
+        {
+            std::lock_guard<std::mutex> lock(stats_mutex);
+            Logger::error("Не удалось создать директорию для: " + output_file_str);
+            stats.failed_files++;
+            return;
+        }
+
         // Обрабатываем файл
+        FilterResult result;
         try
         {
-            bool success = process_function(input_file_str, output_file_str);
-            if (success)
+            result = process_function(input_file_str, output_file_str);
+        }
+        catch (const std::exception& e)
+        {
+            std::lock_guard<std::mutex> lock(stats_mutex);
+            stats.failed_files++;
+            Logger::error("Ошибка при обработке " + input_file_str + ": " + e.what());
+            return;
+        }
+
+        // Обновляем статистику
+        size_t current = 0;
+        {
+            std::lock_guard<std::mutex> lock(stats_mutex);
+            if (result.isSuccess())
             {
                 stats.processed_files++;
+                processed_in_session.insert(output_file_str);
                 Logger::debug("Обработан: " + input_file_str + " -> " + output_file_str);
             }
             else
             {
                 stats.failed_files++;
-                Logger::warning("Не удалось обработать: " + input_file_str);
+                Logger::warning("Не удалось обработать: " + input_file_str + 
+                              ". Ошибка: " + result.getFullMessage());
+            }
+
+            current = ++processed_count;
+
+            // Периодически сохраняем состояние возобновления
+            if (!resume_state_file.empty() && current % 10 == 0)
+            {
+                std::set<std::string> all_processed = processed_files;
+                all_processed.insert(processed_in_session.begin(), processed_in_session.end());
+                ResumeStateManager::saveResumeState(resume_state_file, all_processed);
             }
         }
-        catch (const std::exception& e)
+
+        // Обновляем прогресс
+        if (progress_callback)
         {
-            stats.failed_files++;
-            Logger::error("Ошибка при обработке " + input_file_str + ": " + e.what());
+            const auto current_time = std::chrono::steady_clock::now();
+            const auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(
+                current_time - start_time);
+            
+            double percentage = (static_cast<double>(current) / static_cast<double>(stats.total_files)) * 100.0;
+            
+            double files_per_second = 0.0;
+            std::chrono::seconds estimated_remaining(0);
+            if (elapsed.count() > 0 && current > 0)
+            {
+                files_per_second = static_cast<double>(current) / elapsed.count();
+                if (files_per_second > 0.0)
+                {
+                    const size_t remaining = stats.total_files - current;
+                    estimated_remaining = std::chrono::seconds(
+                        static_cast<long long>(remaining / files_per_second));
+                }
+            }
+
+            ProgressInfo info;
+            info.current = current;
+            info.total = stats.total_files;
+            info.current_file = input_file_str;
+            info.percentage = percentage;
+            info.elapsed_time = elapsed;
+            info.estimated_remaining = estimated_remaining;
+            info.files_per_second = files_per_second;
+
+            progress_callback(info);
         }
+    };
+
+    // Параллельная или последовательная обработка
+    if (use_parallel && num_parallel > 1)
+    {
+        // Параллельная обработка
+        size_t current_index = 0;
+        std::mutex index_mutex;
+
+        // Создаем задачи для пула потоков
+        for (int i = 0; i < num_parallel && i < static_cast<int>(images.size()); ++i)
+        {
+            thread_pool->enqueue([&]() {
+                while (true)
+                {
+                    size_t idx;
+                    {
+                        std::lock_guard<std::mutex> lock(index_mutex);
+                        if (current_index >= images.size())
+                        {
+                            break;
+                        }
+                        idx = current_index++;
+                    }
+                    process_single_file(idx, images[idx]);
+                }
+            });
+        }
+
+        // Ждем завершения всех задач
+        thread_pool->waitAll();
+    }
+    else
+    {
+        // Последовательная обработка
+        for (size_t i = 0; i < images.size(); ++i)
+        {
+            process_single_file(i, images[i]);
+        }
+    }
+
+    // Финальное сохранение состояния возобновления
+    if (!resume_state_file.empty())
+    {
+        std::set<std::string> all_processed = processed_files;
+        all_processed.insert(processed_in_session.begin(), processed_in_session.end());
+        ResumeStateManager::saveResumeState(resume_state_file, all_processed);
     }
 
     return stats;
@@ -242,45 +312,16 @@ std::filesystem::path BatchProcessor::getRelativePath(
     const std::filesystem::path& full_path,
     const std::filesystem::path& base_dir)
 {
-    try
-    {
-        return std::filesystem::relative(full_path, base_dir);
-    }
-    catch (const std::filesystem::filesystem_error&)
-    {
-        // Если не удалось получить относительный путь, возвращаем только имя файла
-        return full_path.filename();
-    }
+    return FileSystemHelper::getRelativePath(full_path, base_dir);
 }
 
 bool BatchProcessor::isImageFile(const std::filesystem::path& path)
 {
-    static const std::vector<std::string> image_extensions = {
-        "jpg", "jpeg", "png"
-    };
-    return hasExtension(path, image_extensions);
+    return FileSystemHelper::isImageFile(path);
 }
 
 bool BatchProcessor::matchesPattern(const std::string& filename, const std::string& pattern)
 {
-    return simplePatternMatch(filename, pattern);
-}
-
-bool BatchProcessor::ensureOutputDirectory(const std::filesystem::path& output_path) const
-{
-    try
-    {
-        std::filesystem::path parent_dir = output_path.parent_path();
-        if (!parent_dir.empty())
-        {
-            std::filesystem::create_directories(parent_dir);
-        }
-        return true;
-    }
-    catch (const std::filesystem::filesystem_error& e)
-    {
-        Logger::error("Ошибка при создании директории: " + std::string(e.what()));
-        return false;
-    }
+    return FileSystemHelper::matchesPattern(filename, pattern);
 }
 

@@ -2,48 +2,27 @@
 #include <ImageProcessor.h>
 #include <utils/ParallelImageProcessor.h>
 #include <utils/FilterResult.h>
+#include <utils/FilterValidator.h>
+#include <utils/FilterValidationHelper.h>
 #include <utils/LookupTables.h>
 #include <algorithm>
 
 FilterResult VignetteFilter::apply(ImageProcessor& image)
 {
-    if (!image.isValid())
+    // Валидация параметра фильтра
+    auto strength_result = FilterValidator::validateIntensity(strength_);
+    
+    // Валидация изображения и параметра с автоматическим добавлением контекста
+    auto validation_result = FilterValidationHelper::validateImageAndParam(
+        image, strength_result, "strength", strength_);
+    if (validation_result.hasError())
     {
-        return FilterResult::failure(FilterError::InvalidImage, "Изображение не загружено");
+        return validation_result;
     }
 
     const auto width = image.getWidth();
     const auto height = image.getHeight();
     const auto channels = image.getChannels();
-
-    // Валидация размеров изображения
-    if (width <= 0 || height <= 0)
-    {
-        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
-        ctx.filter_params = "strength=" + std::to_string(strength_);
-        return FilterResult::failure(FilterError::InvalidSize,
-                                     "Размер изображения должен быть больше нуля", ctx);
-    }
-
-    if (channels != 3 && channels != 4)
-    {
-        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
-        ctx.filter_params = "strength=" + std::to_string(strength_);
-        return FilterResult::failure(FilterError::InvalidChannels, 
-                                     "Ожидается 3 канала (RGB) или 4 канала (RGBA), получено: " + std::to_string(channels),
-                                     ctx);
-    }
-    
-    // Валидация параметра фильтра
-    if (strength_ < 0.0 || strength_ > 1.0)
-    {
-        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
-        ctx.filter_params = "strength=" + std::to_string(strength_);
-        return FilterResult::failure(FilterError::ParameterOutOfRange, 
-                                     "Сила виньетирования должна быть в диапазоне [0.0, 1.0], получено: " + std::to_string(strength_),
-                                     ctx);
-    }
-
     auto* data = image.getData();
 
     // Инициализируем lookup tables
@@ -62,7 +41,7 @@ FilterResult VignetteFilter::apply(ImageProcessor& image)
 
     ParallelImageProcessor::processRowsParallel(
         height,
-        [width, channels, data, center_x, center_y, max_distance, this](int start_row, int end_row)
+        [width, channels, data, center_x, center_y, max_distance, strength = strength_](int start_row, int end_row)
         {
             for (int y = start_row; y < end_row; ++y)
             {
@@ -84,7 +63,7 @@ FilterResult VignetteFilter::apply(ImageProcessor& image)
                     double vignette_factor = 1.0;
                     if (max_distance > 0.0)
                     {
-                        vignette_factor = 1.0 - (distance / max_distance) * strength_;
+                        vignette_factor = 1.0 - (distance / max_distance) * strength;
                         // Ограничиваем диапазон [0.0, 1.0]
                         vignette_factor = std::max(0.0, std::min(1.0, vignette_factor));
                     }

@@ -3,6 +3,10 @@
 #include <utils/ParallelImageProcessor.h>
 #include <utils/FilterResult.h>
 #include <utils/BorderHandler.h>
+#include <utils/IBufferPool.h>
+#include <utils/SafeMath.h>
+#include <utils/FilterValidator.h>
+#include <utils/FilterValidationHelper.h>
 #include <algorithm>
 #include <vector>
 #include <cstring>
@@ -15,12 +19,18 @@ namespace
      * @param histogram Гистограмма значений [0-255]
      * @param total_count Общее количество элементов в окне
      * @return Медианное значение
+     * 
+     * Оптимизированная версия: использует ранний выход и оптимизированный цикл
      */
-    inline uint8_t findMedianFromHistogram(const int* histogram, int total_count) noexcept
+    [[nodiscard]] inline uint8_t findMedianFromHistogram(const int* histogram, int total_count) noexcept
     {
-        const auto target = total_count / 2;
+        // Для нечетного размера окна медиана - это элемент на позиции (total_count - 1) / 2
+        // Для четного размера медиана - это среднее двух центральных элементов, но обычно берем меньший
+        const int target = (total_count - 1) / 2;
         int count = 0;
         
+        // Оптимизация: используем цикл с ранним выходом
+        // Компилятор может оптимизировать этот цикл с помощью векторизации
         for (int i = 0; i < 256; ++i)
         {
             count += histogram[i];
@@ -30,57 +40,60 @@ namespace
             }
         }
         
+        // Fallback: если медиана не найдена (не должно происходить), возвращаем последнее значение
         return 255;
     }
 }
 
 FilterResult MedianFilter::apply(ImageProcessor& image)
 {
-    if (!image.isValid())
-    {
-        return FilterResult::failure(FilterError::InvalidImage, "Изображение не загружено");
-    }
-
     const auto width = image.getWidth();
     const auto height = image.getHeight();
     const auto channels = image.getChannels();
 
-    // Валидация размеров изображения
-    if (width <= 0 || height <= 0)
-    {
-        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
-        ctx.filter_params = "radius=" + std::to_string(radius_);
-        return FilterResult::failure(FilterError::InvalidSize,
-                                     "Размер изображения должен быть больше нуля", ctx);
-    }
-
-    if (channels != 3 && channels != 4)
-    {
-        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
-        ctx.filter_params = "radius=" + std::to_string(radius_);
-        return FilterResult::failure(FilterError::InvalidChannels, 
-                                     "Ожидается 3 канала (RGB) или 4 канала (RGBA), получено: " + std::to_string(channels),
-                                     ctx);
-    }
-    
     // Валидация параметра фильтра
-    if (radius_ < 0)
+    auto radius_result = FilterValidator::validateRadius(radius_, 0, 1000, width, height);
+    
+    // Валидация изображения и параметра с автоматическим добавлением контекста
+    auto validation_result = FilterValidationHelper::validateImageAndParam(
+        image, radius_result, "radius", radius_);
+    if (validation_result.hasError())
     {
-        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
-        ctx.filter_params = "radius=" + std::to_string(radius_);
-        return FilterResult::failure(FilterError::InvalidRadius, 
-                                     "Радиус должен быть >= 0, получено: " + std::to_string(radius_),
-                                     ctx);
+        return validation_result;
     }
 
     const auto* input_data = image.getData();
-    const auto buffer_size = static_cast<size_t>(width) * static_cast<size_t>(height) * static_cast<size_t>(channels);
+    size_t width_height_product = 0;
+    size_t buffer_size = 0;
+    if (!SafeMath::safeMultiply(static_cast<size_t>(width), static_cast<size_t>(height), width_height_product) ||
+        !SafeMath::safeMultiply(width_height_product, static_cast<size_t>(channels), buffer_size))
+    {
+        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
+        ctx.withFilterParam("radius", radius_);
+        return FilterResult::failure(FilterError::ArithmeticOverflow, 
+                                   "Размер изображения слишком большой", ctx);
+    }
     
-    // Создаем буфер для результата
-    std::vector<uint8_t> result(buffer_size);
+    // Получаем буфер из пула или создаем новый
+    std::vector<uint8_t> result;
+    if (buffer_pool_ != nullptr)
+    {
+        result = buffer_pool_->acquire(buffer_size);
+    }
+    else
+    {
+        result.resize(buffer_size);
+    }
     
     const auto window_size = (2 * radius_ + 1) * (2 * radius_ + 1);
-    const auto row_stride = static_cast<size_t>(width) * static_cast<size_t>(channels);
+    size_t row_stride = 0;
+    if (!SafeMath::safeMultiply(static_cast<size_t>(width), static_cast<size_t>(channels), row_stride))
+    {
+        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
+        ctx.withFilterParam("radius", radius_);
+        return FilterResult::failure(FilterError::ArithmeticOverflow, 
+                                   "Размер изображения слишком большой", ctx);
+    }
 
     ParallelImageProcessor::processRowsParallel(
         height,
@@ -218,6 +231,12 @@ FilterResult MedianFilter::apply(ImageProcessor& image)
     // Копируем результат обратно
     auto* data = image.getData();
     std::ranges::copy(result, data);
+
+    // Возвращаем буфер в пул для переиспользования
+    if (buffer_pool_ != nullptr)
+    {
+        buffer_pool_->release(std::move(result));
+    }
 
     return FilterResult::success();
 }

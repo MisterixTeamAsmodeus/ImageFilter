@@ -114,21 +114,5 @@ public:
      */
     bool deletePreset(const std::string& filepath) const;
 
-private:
-    /**
-     * @brief Парсит JSON строку в FilterChainConfig
-     * 
-     * @param json JSON строка
-     * @return Умный указатель на конфигурацию или nullptr при ошибке
-     */
-    std::unique_ptr<FilterChainConfig> parseJson(const std::string& json) const;
-
-    /**
-     * @brief Преобразует FilterChainConfig в JSON строку
-     * 
-     * @param config Конфигурация для преобразования
-     * @return JSON строка
-     */
-    std::string toJson(const FilterChainConfig& config) const;
 };
 

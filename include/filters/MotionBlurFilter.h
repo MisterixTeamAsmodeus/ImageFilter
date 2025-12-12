@@ -3,6 +3,9 @@
 #include <filters/IFilter.h>
 #include <utils/BorderHandler.h>
 
+// Forward declaration
+class IBufferPool;
+
 /**
  * @brief Фильтр размытия движения
  * 
@@ -17,11 +20,13 @@ public:
      * @param angle Угол направления размытия в градусах (0 = горизонтально, 90 = вертикально, по умолчанию 0)
      *              При некорректных значениях используются значения по умолчанию
      * @param borderStrategy Стратегия обработки границ (по умолчанию Mirror)
+     * @param buffer_pool Пул буферов для переиспользования временных буферов (опционально)
      */
     explicit MotionBlurFilter(int length = 10, 
                               double angle = 0.0,
-                              BorderHandler::Strategy borderStrategy = BorderHandler::Strategy::Mirror) 
-        : angle_(angle), length_(length > 0 ? length : 10), border_handler_(borderStrategy) {}
+                              BorderHandler::Strategy borderStrategy = BorderHandler::Strategy::Mirror,
+                              IBufferPool* buffer_pool = nullptr) 
+        : angle_(angle), length_(length > 0 ? length : 10), border_handler_(borderStrategy), buffer_pool_(buffer_pool) {}
 
     /**
      * @brief Применяет фильтр размытия движения к изображению
@@ -38,6 +43,7 @@ private:
     double angle_;   // Угол направления размытия в градусах
     int length_;     // Длина размытия
     BorderHandler border_handler_;  // Обработчик границ
+    IBufferPool* buffer_pool_;  // Пул буферов для переиспользования (может быть nullptr)
 };
 
 

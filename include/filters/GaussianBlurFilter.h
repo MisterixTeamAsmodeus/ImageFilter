@@ -4,8 +4,9 @@
 #include <utils/BorderHandler.h>
 #include <cstdint>
 #include <vector>
-#include <unordered_map>
-#include <shared_mutex>
+
+// Forward declaration
+class IBufferPool;
 
 /**
  * @brief Фильтр размытия по Гауссу
@@ -27,10 +28,12 @@ public:
      * @param radius Радиус размытия (по умолчанию 5.0)
      *               Должен быть > 0. При некорректном значении используется 5.0
      * @param borderStrategy Стратегия обработки границ (по умолчанию Mirror)
+     * @param buffer_pool Пул буферов для переиспользования временных буферов (опционально)
      */
     explicit GaussianBlurFilter(double radius = 5.0, 
-                               BorderHandler::Strategy borderStrategy = BorderHandler::Strategy::Mirror) 
-        : radius_(radius > 0.0 ? radius : 5.0), border_handler_(borderStrategy) {}
+                               BorderHandler::Strategy borderStrategy = BorderHandler::Strategy::Mirror,
+                               IBufferPool* buffer_pool = nullptr) 
+        : radius_(radius > 0.0 ? radius : 5.0), border_handler_(borderStrategy), buffer_pool_(buffer_pool) {}
 
     /**
      * @brief Применяет фильтр размытия по Гауссу
@@ -46,5 +49,6 @@ public:
 private:
     double radius_;  // Радиус размытия
     BorderHandler border_handler_;  // Обработчик границ
+    IBufferPool* buffer_pool_;  // Пул буферов для переиспользования (может быть nullptr)
 };
 

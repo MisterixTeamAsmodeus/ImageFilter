@@ -3,6 +3,7 @@
 #include <utils/FilterFactory.h>
 #include <utils/BatchProcessor.h>
 #include <utils/Config.h>
+#include <utils/FilterResult.h>
 #include <CLI/CLI.hpp>
 #include "test_utils.h"
 #include <filesystem>
@@ -59,12 +60,12 @@ TEST_F(IntegrationTestBase, FullImageProcessingCycle)
     ASSERT_NE(allocated_data, nullptr);
     std::memcpy(allocated_data, test_image.data(), test_image.size());
     
-    ASSERT_TRUE(processor.resize(width, height, allocated_data));
-    ASSERT_TRUE(processor.saveToFile(input_file));
+    ASSERT_TRUE(processor.resize(width, height, allocated_data).isSuccess());
+    ASSERT_TRUE(processor.saveToFile(input_file).isSuccess());
     
     // Загружаем изображение
     ImageProcessor loaded_processor;
-    ASSERT_TRUE(loaded_processor.loadFromFile(input_file));
+    ASSERT_TRUE(loaded_processor.loadFromFile(input_file).isSuccess());
     EXPECT_EQ(loaded_processor.getWidth(), width);
     EXPECT_EQ(loaded_processor.getHeight(), height);
     
@@ -78,7 +79,7 @@ TEST_F(IntegrationTestBase, FullImageProcessingCycle)
     EXPECT_TRUE(result.isSuccess());
     
     // Сохраняем результат
-    ASSERT_TRUE(loaded_processor.saveToFile(output_file));
+    ASSERT_TRUE(loaded_processor.saveToFile(output_file).isSuccess());
     
     // Проверяем, что файл создан
     EXPECT_TRUE(fs::exists(output_file));
@@ -98,7 +99,7 @@ TEST_F(IntegrationTestBase, FilterChain)
     ASSERT_NE(allocated_data, nullptr);
     std::memcpy(allocated_data, test_image.data(), test_image.size());
     
-    ASSERT_TRUE(processor.resize(width, height, allocated_data));
+    ASSERT_TRUE(processor.resize(width, height, allocated_data).isSuccess());
     
     // Применяем цепочку фильтров
     auto& factory = FilterFactory::getInstance();
@@ -145,11 +146,11 @@ TEST_F(IntegrationTestBase, BatchProcessing)
         ASSERT_NE(allocated_data, nullptr);
         std::memcpy(allocated_data, test_image.data(), test_image.size());
         
-        ASSERT_TRUE(processor.resize(width, height, allocated_data));
+        ASSERT_TRUE(processor.resize(width, height, allocated_data).isSuccess());
         
         std::string filename = "test_" + std::to_string(i) + ".jpg";
         std::string filepath = (input_dir / filename).string();
-        ASSERT_TRUE(processor.saveToFile(filepath));
+        ASSERT_TRUE(processor.saveToFile(filepath).isSuccess());
     }
     
     // Обрабатываем все файлы
@@ -158,23 +159,24 @@ TEST_F(IntegrationTestBase, BatchProcessing)
     auto& factory = FilterFactory::getInstance();
     CLI::App app;
     
-    auto process_function = [&factory, &app](const std::string& input_path, const std::string& output_path) -> bool {
+    auto process_function = [&factory, &app](const std::string& input_path, const std::string& output_path) -> FilterResult {
         ImageProcessor image;
-        if (!image.loadFromFile(input_path))
+        const auto load_result = image.loadFromFile(input_path);
+        if (!load_result.isSuccess())
         {
-            return false;
+            return load_result;
         }
         
         auto filter = factory.create("grayscale", app);
         if (!filter)
         {
-            return false;
+            return FilterResult::failure(FilterError::InvalidParameter, "Не удалось создать фильтр");
         }
         
         const auto result = filter->apply(image);
         if (!result.isSuccess())
         {
-            return false;
+            return result;
         }
         
         return image.saveToFile(output_path);
@@ -255,7 +257,7 @@ TEST_F(IntegrationTestBase, RealImageProcessing)
     ASSERT_NE(allocated_data, nullptr);
     std::memcpy(allocated_data, image_data.data(), image_data.size());
     
-    ASSERT_TRUE(processor.resize(width, height, allocated_data));
+    ASSERT_TRUE(processor.resize(width, height, allocated_data).isSuccess());
     
     // Применяем несколько фильтров
     auto& factory = FilterFactory::getInstance();
@@ -274,6 +276,7 @@ TEST_F(IntegrationTestBase, RealImageProcessing)
     EXPECT_TRUE(blur->apply(processor).isSuccess());
     
     // Повышение резкости
+    // Используем значение по умолчанию (1.0), опция не требуется
     auto sharpen = factory.create("sharpen", app);
     ASSERT_NE(sharpen, nullptr);
     EXPECT_TRUE(sharpen->apply(processor).isSuccess());
@@ -288,7 +291,7 @@ TEST_F(IntegrationTestBase, ErrorHandlingInFullCycle)
 {
     // Пытаемся загрузить несуществующий файл
     ImageProcessor processor;
-    EXPECT_FALSE(processor.loadFromFile("nonexistent_file.jpg"));
+    EXPECT_FALSE(processor.loadFromFile("nonexistent_file.jpg").isSuccess());
     
     // Пытаемся применить фильтр к невалидному изображению
     auto& factory = FilterFactory::getInstance();

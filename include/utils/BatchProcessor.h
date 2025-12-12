@@ -4,6 +4,12 @@
 #include <vector>
 #include <functional>
 #include <filesystem>
+#include <chrono>
+#include <set>
+#include <utils/FilterResult.h>
+
+// Forward declaration
+class IThreadPool;
 
 /**
  * @brief Результат обработки одного файла в пакетном режиме
@@ -28,12 +34,24 @@ struct BatchStatistics
 };
 
 /**
- * @brief Callback для отображения прогресса
- * @param current Номер текущего обрабатываемого файла (начиная с 1)
- * @param total Общее количество файлов
- * @param current_file Путь к текущему обрабатываемому файлу
+ * @brief Информация о прогрессе обработки
  */
-using ProgressCallback = std::function<void(size_t current, size_t total, const std::string& current_file)>;
+struct ProgressInfo
+{
+    size_t current;               // Номер текущего обрабатываемого файла (начиная с 1)
+    size_t total;                 // Общее количество файлов
+    std::string current_file;     // Путь к текущему обрабатываемому файлу
+    double percentage;            // Процент выполнения (0.0 - 100.0)
+    std::chrono::seconds elapsed_time;  // Прошедшее время в секундах
+    std::chrono::seconds estimated_remaining;  // Оценка оставшегося времени в секундах
+    double files_per_second;      // Скорость обработки (файлов в секунду)
+};
+
+/**
+ * @brief Callback для отображения прогресса
+ * @param info Информация о прогрессе обработки
+ */
+using ProgressCallback = std::function<void(const ProgressInfo& info)>;
 
 /**
  * @brief Класс для пакетной обработки изображений
@@ -42,8 +60,10 @@ using ProgressCallback = std::function<void(size_t current, size_t total, const 
  * - Рекурсивный обход директорий
  * - Фильтрацию файлов по шаблону
  * - Сохранение структуры директорий
- * - Отображение прогресса
+ * - Отображение прогресса с временем и ETA
  * - Обработку ошибок для отдельных файлов
+ * - Возобновление прерванной обработки
+ * - Параллельную обработку нескольких изображений
  */
 class BatchProcessor
 {
@@ -69,13 +89,33 @@ public:
     /**
      * @brief Обрабатывает все найденные изображения
      * @param process_function Функция обработки одного изображения
-     *                         Принимает входной и выходной путь, возвращает true при успехе
+     *                         Принимает входной и выходной путь, возвращает FilterResult
      * @param progress_callback Callback для отображения прогресса (опционально)
+     * @param thread_pool Пул потоков для параллельной обработки (nullptr = последовательная обработка)
+     * @param max_parallel Максимальное количество параллельно обрабатываемых изображений (0 = автоматически)
      * @return Статистика обработки
      */
     BatchStatistics processAll(
-        const std::function<bool(const std::string&, const std::string&)>& process_function,
-        ProgressCallback progress_callback = nullptr) const;
+        const std::function<FilterResult(const std::string&, const std::string&)>& process_function,
+        ProgressCallback progress_callback = nullptr,
+        IThreadPool* thread_pool = nullptr,
+        int max_parallel = 0) const;
+
+    /**
+     * @brief Обрабатывает все найденные изображения с поддержкой возобновления
+     * @param process_function Функция обработки одного изображения
+     * @param progress_callback Callback для отображения прогресса (опционально)
+     * @param resume_state_file Путь к файлу состояния для возобновления (пустая строка = без возобновления)
+     * @param thread_pool Пул потоков для параллельной обработки (nullptr = последовательная обработка)
+     * @param max_parallel Максимальное количество параллельно обрабатываемых изображений (0 = автоматически)
+     * @return Статистика обработки
+     */
+    BatchStatistics processAllWithResume(
+        const std::function<FilterResult(const std::string&, const std::string&)>& process_function,
+        ProgressCallback progress_callback = nullptr,
+        const std::string& resume_state_file = "",
+        IThreadPool* thread_pool = nullptr,
+        int max_parallel = 0) const;
 
     /**
      * @brief Получает относительный путь от базовой директории
@@ -107,20 +147,5 @@ private:
     std::string output_dir_;
     std::string pattern_;
     bool recursive_;
-
-    /**
-     * @brief Рекурсивно находит изображения в директории
-     * @param dir Директория для поиска
-     * @param images Вектор для сохранения найденных путей
-     */
-    void findImagesRecursive(const std::filesystem::path& dir, 
-                            std::vector<std::filesystem::path>& images) const;
-
-    /**
-     * @brief Создает выходную директорию, если она не существует
-     * @param output_path Путь к выходному файлу
-     * @return true если директория создана или уже существует
-     */
-    bool ensureOutputDirectory(const std::filesystem::path& output_path) const;
 };
 

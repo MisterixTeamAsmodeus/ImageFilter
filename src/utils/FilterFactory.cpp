@@ -22,6 +22,7 @@
 #include <filters/PosterizeFilter.h>
 #include <filters/ThresholdFilter.h>
 #include <filters/VignetteFilter.h>
+#include <utils/IBufferPool.h>
 
 #include <algorithm>
 #include <vector>
@@ -38,12 +39,19 @@ namespace
     template<typename T>
     T getOptionValue(const CLI::App& app, const std::string& option_name, const T& default_value)
     {
-        const auto* opt = app.get_option(option_name);
-        if (opt && opt->count() > 0)
+        try
         {
-            T value = default_value;
-            opt->results(value);
-            return value;
+            const auto* opt = app.get_option(option_name);
+            if (opt && opt->count() > 0)
+            {
+                T value = default_value;
+                opt->results(value);
+                return value;
+            }
+        }
+        catch (const std::exception&)
+        {
+            // Опция не найдена, возвращаем значение по умолчанию
         }
         return default_value;
     }
@@ -105,16 +113,33 @@ void FilterFactory::registerAll()
     });
 
     // Фильтры краёв и деталей
-    registerFilter("sharpen", [](const CLI::App&) {
-        return std::make_unique<SharpenFilter>();
+    registerFilter("sharpen", [this](const CLI::App& app) {
+        const double strength = getOptionValue(app, "--sharpen-strength", 1.0);
+        return std::make_unique<SharpenFilter>(strength, BorderHandler::Strategy::Mirror, buffer_pool_);
     });
 
-    registerFilter("edges", [](const CLI::App&) {
-        return std::make_unique<EdgeDetectionFilter>();
+    registerFilter("edges", [](const CLI::App& app) {
+        const double sensitivity = getOptionValue(app, "--edge-sensitivity", 0.5);
+        std::string operator_str = getOptionValue(app, "--edge-operator", std::string("sobel"));
+        
+        // Преобразуем строку в enum
+        EdgeDetectionFilter::Operator op = EdgeDetectionFilter::Operator::Sobel;
+        if (operator_str == "prewitt")
+        {
+            op = EdgeDetectionFilter::Operator::Prewitt;
+        }
+        else if (operator_str == "scharr")
+        {
+            op = EdgeDetectionFilter::Operator::Scharr;
+        }
+        // По умолчанию используется Sobel
+        
+        return std::make_unique<EdgeDetectionFilter>(sensitivity, op);
     });
 
-    registerFilter("emboss", [](const CLI::App&) {
-        return std::make_unique<EmbossFilter>();
+    registerFilter("emboss", [](const CLI::App& app) {
+        const double strength = getOptionValue(app, "--emboss-strength", 1.0);
+        return std::make_unique<EmbossFilter>(strength);
     });
 
     registerFilter("outline", [](const CLI::App&) {
@@ -122,25 +147,25 @@ void FilterFactory::registerAll()
     });
 
     // Фильтры размытия и шума
-    registerFilter("blur", [](const CLI::App& app) {
+    registerFilter("blur", [this](const CLI::App& app) {
         const double radius = getOptionValue(app, "--blur-radius", 5.0);
-        return std::make_unique<GaussianBlurFilter>(radius);
+        return std::make_unique<GaussianBlurFilter>(radius, BorderHandler::Strategy::Mirror, buffer_pool_);
     });
 
-    registerFilter("box_blur", [](const CLI::App& app) {
+    registerFilter("box_blur", [this](const CLI::App& app) {
         const int radius = getOptionValue(app, "--box-blur-radius", 5);
-        return std::make_unique<BoxBlurFilter>(radius);
+        return std::make_unique<BoxBlurFilter>(radius, BorderHandler::Strategy::Mirror, buffer_pool_);
     });
 
-    registerFilter("motion_blur", [](const CLI::App& app) {
+    registerFilter("motion_blur", [this](const CLI::App& app) {
         const int length = getOptionValue(app, "--motion-blur-length", 10);
         const double angle = getOptionValue(app, "--motion-blur-angle", 0.0);
-        return std::make_unique<MotionBlurFilter>(length, angle);
+        return std::make_unique<MotionBlurFilter>(length, angle, BorderHandler::Strategy::Mirror, buffer_pool_);
     });
 
-    registerFilter("median", [](const CLI::App& app) {
+    registerFilter("median", [this](const CLI::App& app) {
         const int radius = getOptionValue(app, "--median-radius", 2);
-        return std::make_unique<MedianFilter>(radius);
+        return std::make_unique<MedianFilter>(radius, BorderHandler::Strategy::Mirror, buffer_pool_);
     });
 
     registerFilter("noise", [](const CLI::App& app) {
@@ -197,4 +222,14 @@ std::vector<std::string> FilterFactory::getRegisteredFilters() const
     
     std::sort(filters.begin(), filters.end());
     return filters;
+}
+
+void FilterFactory::setBufferPool(IBufferPool* buffer_pool) noexcept
+{
+    buffer_pool_ = buffer_pool;
+}
+
+IBufferPool* FilterFactory::getBufferPool() const noexcept
+{
+    return buffer_pool_;
 }

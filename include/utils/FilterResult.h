@@ -92,6 +92,54 @@ struct ErrorContext
     }
 
     /**
+     * @brief Добавляет параметр фильтра в контекст ошибки
+     * 
+     * Если параметры уже существуют, новый параметр добавляется через запятую.
+     * 
+     * @param param_name Имя параметра
+     * @param param_value Значение параметра
+     * @return Ссылка на себя для цепочки вызовов
+     */
+    ErrorContext& withFilterParam(const std::string& param_name, const std::string& param_value)
+    {
+        const std::string param_str = param_name + "=" + param_value;
+        if (filter_params.has_value())
+        {
+            filter_params = filter_params.value() + ", " + param_str;
+        }
+        else
+        {
+            filter_params = param_str;
+        }
+        return *this;
+    }
+
+    /**
+     * @brief Добавляет параметр фильтра (строковый литерал) в контекст ошибки
+     * 
+     * @param param_name Имя параметра
+     * @param param_value Значение параметра (строковый литерал)
+     * @return Ссылка на себя для цепочки вызовов
+     */
+    ErrorContext& withFilterParam(const std::string& param_name, const char* param_value)
+    {
+        return withFilterParam(param_name, std::string(param_value));
+    }
+
+    /**
+     * @brief Добавляет параметр фильтра (числовой) в контекст ошибки
+     * 
+     * @param param_name Имя параметра
+     * @param param_value Значение параметра
+     * @return Ссылка на себя для цепочки вызовов
+     */
+    template<typename T>
+    ErrorContext& withFilterParam(const std::string& param_name, T param_value)
+    {
+        return withFilterParam(param_name, std::to_string(param_value));
+    }
+
+    /**
      * @brief Форматирует контекст в строку для сообщения об ошибке
      * @return Строковое представление контекста
      */
@@ -164,18 +212,9 @@ struct FilterResult
     FilterError error;
 
     /**
-     * @brief Явное padding поле для выравнивания структуры
-     * 
-     * Структура требует выравнивания 8 байт из-за std::string и std::optional,
-     * но FilterError занимает только 4 байта. Это поле явно занимает оставшиеся
-     * 4 байта, чтобы избежать неявного padding и предупреждений компилятора.
-     */
-    char _padding[4];
-
-    /**
      * @brief Конструктор для успешного результата
      */
-    FilterResult() : message(), context(std::nullopt), error(FilterError::Success), _padding{} {}
+    FilterResult() : message(), context(std::nullopt), error(FilterError::Success) {}
 
     /**
      * @brief Конструктор для результата с ошибкой
@@ -185,7 +224,7 @@ struct FilterResult
      */
     FilterResult(FilterError err, const std::string& msg = "", 
                  const std::optional<ErrorContext>& ctx = std::nullopt) 
-        : message(msg), context(ctx), error(err), _padding{} {}
+        : message(msg), context(ctx), error(err) {}
 
     /**
      * @brief Проверяет, успешен ли результат

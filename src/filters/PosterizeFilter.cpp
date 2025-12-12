@@ -2,53 +2,32 @@
 #include <ImageProcessor.h>
 #include <utils/ParallelImageProcessor.h>
 #include <utils/FilterResult.h>
+#include <utils/FilterValidator.h>
+#include <utils/FilterValidationHelper.h>
 #include <algorithm>
 
 FilterResult PosterizeFilter::apply(ImageProcessor& image)
 {
-    if (!image.isValid())
+    // Валидация параметра фильтра
+    auto levels_result = FilterValidator::validateRange(levels_, 2, 256, "levels");
+    
+    // Валидация изображения и параметра с автоматическим добавлением контекста
+    auto validation_result = FilterValidationHelper::validateImageAndParam(
+        image, levels_result, "levels", levels_);
+    if (validation_result.hasError())
     {
-        return FilterResult::failure(FilterError::InvalidImage, "Изображение не загружено");
+        return validation_result;
     }
 
     const auto width = image.getWidth();
     const auto height = image.getHeight();
     const auto channels = image.getChannels();
-
-    // Валидация размеров изображения
-    if (width <= 0 || height <= 0)
-    {
-        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
-        ctx.filter_params = "levels=" + std::to_string(levels_);
-        return FilterResult::failure(FilterError::InvalidSize,
-                                     "Размер изображения должен быть больше нуля", ctx);
-    }
-
-    if (channels != 3 && channels != 4)
-    {
-        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
-        ctx.filter_params = "levels=" + std::to_string(levels_);
-        return FilterResult::failure(FilterError::InvalidChannels, 
-                                     "Ожидается 3 канала (RGB) или 4 канала (RGBA), получено: " + std::to_string(channels),
-                                     ctx);
-    }
-    
-    // Валидация параметра фильтра
-    if (levels_ < 2 || levels_ > 256)
-    {
-        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
-        ctx.filter_params = "levels=" + std::to_string(levels_);
-        return FilterResult::failure(FilterError::ParameterOutOfRange, 
-                                     "Количество уровней должно быть в диапазоне [2, 256], получено: " + std::to_string(levels_),
-                                     ctx);
-    }
-
     auto* data = image.getData();
     const auto step = 256 / levels_;
 
     ParallelImageProcessor::processRowsParallel(
         height,
-        [width, channels, data, step, this](int start_row, int end_row)
+        [width, channels, data, step, levels = levels_](int start_row, int end_row)
         {
             for (int y = start_row; y < end_row; ++y)
             {
@@ -66,7 +45,7 @@ FilterResult PosterizeFilter::apply(ImageProcessor& image)
                         // Квантуем значение
                         const auto quantized = (old_value / step) * step;
                         // Ограничиваем максимальным значением
-                        const auto new_value = std::min(quantized, (levels_ - 1) * step);
+                        const auto new_value = std::min(quantized, (levels - 1) * step);
                         data[pixel_offset + static_cast<size_t>(c)] = static_cast<uint8_t>(std::max(0, std::min(255, new_value)));
                     }
                 }

@@ -7,18 +7,26 @@ namespace {
      * @param coord Координата для обработки
      * @param max Максимальное значение координаты (не включительно)
      * @return Обработанная координата
+     * 
+     * Оптимизированная версия: использует unsigned сравнение для быстрой проверки диапазона
      */
-    [[nodiscard]] int handleMirror(int coord, int max) noexcept
+    [[nodiscard]] inline int handleMirror(int coord, int max) noexcept
     {
+        // Быстрая проверка: если координата в допустимом диапазоне, возвращаем как есть
+        // Используем unsigned сравнение для проверки 0 <= coord < max за одну операцию
+        if (static_cast<unsigned int>(coord) < static_cast<unsigned int>(max))
+        {
+            return coord;
+        }
+        
+        // Обработка отрицательных координат
         if (coord < 0)
         {
             return -coord;
         }
-        if (coord >= max)
-        {
-            return 2 * max - coord - 1;
-        }
-        return coord;
+        
+        // Обработка координат >= max
+        return 2 * max - coord - 1;
     }
 
     /**
@@ -27,7 +35,7 @@ namespace {
      * @param max Максимальное значение координаты (не включительно)
      * @return Обработанная координата
      */
-    [[nodiscard]] int handleClamp(int coord, int max) noexcept
+    [[nodiscard]] inline int handleClamp(int coord, int max) noexcept
     {
         return std::clamp(coord, 0, max - 1);
     }
@@ -37,22 +45,22 @@ namespace {
      * @param coord Координата для обработки
      * @param max Максимальное значение координаты (не включительно)
      * @return Обработанная координата
+     * 
+     * Оптимизированная версия: использует модульную арифметику вместо цикла
      */
-    [[nodiscard]] int handleWrap(int coord, int max) noexcept
+    [[nodiscard]] inline int handleWrap(int coord, int max) noexcept
     {
         if (max <= 0)
         {
             return 0;
         }
 
-        // Обрабатываем отрицательные координаты
-        while (coord < 0)
-        {
-            coord += max;
-        }
-
-        // Обрабатываем координаты >= max
-        return coord % max;
+        // Оптимизация: используем модульную арифметику для отрицательных чисел
+        // Для отрицательных чисел: ((coord % max) + max) % max
+        // Для положительных: coord % max
+        int result = coord % max;
+        // Если результат отрицательный, добавляем max
+        return (result < 0) ? (result + max) : result;
     }
 
     /**
@@ -60,14 +68,18 @@ namespace {
      * @param coord Координата для обработки
      * @param max Максимальное значение координаты (не включительно)
      * @return Обработанная координата
+     * 
+     * Оптимизированная версия: идентична Clamp, но оставлена для ясности API
      */
-    [[nodiscard]] int handleExtend(int coord, int max) noexcept
+    [[nodiscard]] inline int handleExtend(int coord, int max) noexcept
     {
+        // Оптимизация: используем битовую операцию для быстрой проверки знака
         if (coord < 0)
         {
             return 0;
         }
-        if (coord >= max)
+        // Используем unsigned сравнение для проверки >= max
+        if (static_cast<unsigned int>(coord) >= static_cast<unsigned int>(max))
         {
             return max - 1;
         }

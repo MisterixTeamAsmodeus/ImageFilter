@@ -2,34 +2,21 @@
 #include <ImageProcessor.h>
 #include <utils/ParallelImageProcessor.h>
 #include <utils/FilterResult.h>
+#include <utils/FilterValidationHelper.h>
+#include <utils/ColorConversionUtils.h>
 
 FilterResult GrayscaleFilter::apply(ImageProcessor& image)
 {
-    if (!image.isValid())
+    // Базовая валидация изображения
+    auto validation_result = FilterValidationHelper::validateImageOnly(image);
+    if (validation_result.hasError())
     {
-        return FilterResult::failure(FilterError::InvalidImage, "Изображение не загружено");
+        return validation_result;
     }
 
     const auto width = image.getWidth();
     const auto height = image.getHeight();
     const auto channels = image.getChannels();
-
-    // Валидация размеров изображения
-    if (width <= 0 || height <= 0)
-    {
-        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
-        return FilterResult::failure(FilterError::InvalidSize,
-                                     "Размер изображения должен быть больше нуля", ctx);
-    }
-
-    if (channels != 3 && channels != 4)
-    {
-        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
-        return FilterResult::failure(FilterError::InvalidChannels, 
-                                     "Ожидается 3 канала (RGB) или 4 канала (RGBA), получено: " + std::to_string(channels),
-                                     ctx);
-    }
-
     auto* data = image.getData();
 
     // Параллельная обработка строк изображения
@@ -46,19 +33,6 @@ FilterResult GrayscaleFilter::apply(ImageProcessor& image)
                 // Обрабатываем каждый пиксель в строке
                 for (int x = 0; x < width; ++x)
                 {
-                    // Константы для преобразования RGB в градации серого
-                    // Эти коэффициенты основаны на восприятии яркости человеческим глазом:
-                    // - Зеленый канал имеет наибольший вес (0.587), так как глаз наиболее чувствителен к зеленому
-                    // - Красный канал имеет средний вес (0.299)
-                    // - Синий канал имеет наименьший вес (0.114)
-                    // Используем целочисленную арифметику для оптимизации:
-                    // Y = (299*R + 587*G + 114*B) / 1000
-                    // Для точности используем: (19595*R + 38470*G + 7471*B) >> 16
-                    // Это эквивалентно формуле с коэффициентами 0.299, 0.587, 0.114
-                    constexpr int R_COEFF = 19595; // 0.299 * 65536
-                    constexpr int G_COEFF = 38470; // 0.587 * 65536
-                    constexpr int B_COEFF = 7471; // 0.114 * 65536
-
                     const auto pixel_offset = row_offset + static_cast<size_t>(x) * static_cast<size_t>(channels);
 
                     // Получаем значения каналов RGB
@@ -67,9 +41,8 @@ FilterResult GrayscaleFilter::apply(ImageProcessor& image)
                     const auto b = static_cast<int>(data[pixel_offset + 2]);
 
                     // Применяем формулу преобразования в градации серого
-                    // Используем целочисленную арифметику с битовым сдвигом для деления на 65536
-                    // Это быстрее, чем операции с плавающей точкой
-                    const auto gray = static_cast<uint8_t>((R_COEFF * r + G_COEFF * g + B_COEFF * b) >> 16);
+                    // Используем общую утилиту для устранения дублирования кода
+                    const auto gray = ColorConversionUtils::rgbToGrayscale(r, g, b);
 
                     // Присваиваем одинаковое значение всем трем цветовым каналам
                     // Альфа-канал (если есть) сохраняется без изменений
@@ -98,5 +71,10 @@ std::string GrayscaleFilter::getDescription() const
 std::string GrayscaleFilter::getCategory() const
 {
     return "Цветовой";
+}
+
+bool GrayscaleFilter::supportsInPlace() const noexcept
+{
+    return true;
 }
 

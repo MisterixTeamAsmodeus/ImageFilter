@@ -2,34 +2,20 @@
 #include <ImageProcessor.h>
 #include <utils/ParallelImageProcessor.h>
 #include <utils/FilterResult.h>
+#include <utils/FilterValidationHelper.h>
 
 FilterResult InvertFilter::apply(ImageProcessor& image)
 {
-    if (!image.isValid())
+    // Базовая валидация изображения
+    auto validation_result = FilterValidationHelper::validateImageOnly(image);
+    if (validation_result.hasError())
     {
-        return FilterResult::failure(FilterError::InvalidImage, "Изображение не загружено");
+        return validation_result;
     }
 
     const auto width = image.getWidth();
     const auto height = image.getHeight();
     const auto channels = image.getChannels();
-
-    // Валидация размеров изображения
-    if (width <= 0 || height <= 0)
-    {
-        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
-        return FilterResult::failure(FilterError::InvalidSize,
-                                     "Размер изображения должен быть больше нуля", ctx);
-    }
-
-    if (channels != 3 && channels != 4)
-    {
-        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
-        return FilterResult::failure(FilterError::InvalidChannels, 
-                                     "Ожидается 3 канала (RGB) или 4 канала (RGBA), получено: " + std::to_string(channels),
-                                     ctx);
-    }
-
     auto* data = image.getData();
 
     ParallelImageProcessor::processRowsParallel(
@@ -71,6 +57,11 @@ std::string InvertFilter::getDescription() const
 std::string InvertFilter::getCategory() const
 {
     return "Цветовой";
+}
+
+bool InvertFilter::supportsInPlace() const noexcept
+{
+    return true;
 }
 
 

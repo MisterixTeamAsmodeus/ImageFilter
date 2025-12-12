@@ -1,7 +1,9 @@
 #include <utils/BMPHandler.h>
+#include <utils/SafeMath.h>
 #include <fstream>
 #include <algorithm>
 #include <cstring>
+#include <limits>
 
 namespace BMPHandler
 {
@@ -76,7 +78,25 @@ namespace BMPHandler
         }
 
         // Вычисляем размер строки с учетом выравнивания (должно быть кратно 4 байтам)
-        const int row_size = ((width * 3 + 3) / 4) * 4;
+        size_t width_3 = 0;
+        size_t width_3_plus_3 = 0;
+        if (!SafeMath::safeMultiply(static_cast<size_t>(width), static_cast<size_t>(3), width_3) ||
+            !SafeMath::safeAdd(width_3, static_cast<size_t>(3), width_3_plus_3))
+        {
+            return nullptr;
+        }
+        
+        size_t row_size_unpadded = 0;
+        if (!SafeMath::safeDivide(width_3_plus_3, static_cast<size_t>(4), row_size_unpadded))
+        {
+            return nullptr;
+        }
+        
+        size_t row_size = 0;
+        if (!SafeMath::safeMultiply(row_size_unpadded, static_cast<size_t>(4), row_size))
+        {
+            return nullptr;
+        }
 
         // Перемещаемся к началу данных изображения
         file.seekg(header.data_offset, std::ios::beg);
@@ -86,7 +106,15 @@ namespace BMPHandler
         }
 
         // Выделяем память для данных
-        uint8_t* image_data = static_cast<uint8_t*>(std::malloc(static_cast<size_t>(width) * static_cast<size_t>(height) * 3));
+        size_t width_height_product = 0;
+        size_t buffer_size = 0;
+        if (!SafeMath::safeMultiply(static_cast<size_t>(width), static_cast<size_t>(height), width_height_product) ||
+            !SafeMath::safeMultiply(width_height_product, static_cast<size_t>(3), buffer_size))
+        {
+            return nullptr;
+        }
+        
+        uint8_t* image_data = static_cast<uint8_t*>(std::malloc(buffer_size));
         if (image_data == nullptr)
         {
             return nullptr;
@@ -112,8 +140,18 @@ namespace BMPHandler
                 // Копируем RGB данные (BMP хранит в формате BGR)
                 for (int x = 0; x < width; ++x)
                 {
-                    const size_t src_offset = static_cast<size_t>(x) * 3;
-                    const size_t dst_offset = (static_cast<size_t>(y) * static_cast<size_t>(width) + static_cast<size_t>(x)) * 3;
+                    size_t src_offset = 0;
+                    size_t y_width_sum = 0;
+                    size_t pixel_index = 0;
+                    size_t dst_offset = 0;
+                    if (!SafeMath::safeMultiply(static_cast<size_t>(x), static_cast<size_t>(3), src_offset) ||
+                        !SafeMath::safeMultiply(static_cast<size_t>(y), static_cast<size_t>(width), y_width_sum) ||
+                        !SafeMath::safeAdd(y_width_sum, static_cast<size_t>(x), pixel_index) ||
+                        !SafeMath::safeMultiply(pixel_index, static_cast<size_t>(3), dst_offset))
+                    {
+                        std::free(image_data);
+                        return nullptr;
+                    }
                     
                     // Конвертируем BGR в RGB
                     image_data[dst_offset + 0] = row[src_offset + 2]; // R
@@ -139,8 +177,18 @@ namespace BMPHandler
                 // Копируем RGB данные (BMP хранит в формате BGR)
                 for (int x = 0; x < width; ++x)
                 {
-                    const size_t src_offset = static_cast<size_t>(x) * 3;
-                    const size_t dst_offset = (static_cast<size_t>(y) * static_cast<size_t>(width) + static_cast<size_t>(x)) * 3;
+                    size_t src_offset = 0;
+                    size_t y_width_sum = 0;
+                    size_t pixel_index = 0;
+                    size_t dst_offset = 0;
+                    if (!SafeMath::safeMultiply(static_cast<size_t>(x), static_cast<size_t>(3), src_offset) ||
+                        !SafeMath::safeMultiply(static_cast<size_t>(y), static_cast<size_t>(width), y_width_sum) ||
+                        !SafeMath::safeAdd(y_width_sum, static_cast<size_t>(x), pixel_index) ||
+                        !SafeMath::safeMultiply(pixel_index, static_cast<size_t>(3), dst_offset))
+                    {
+                        std::free(image_data);
+                        return nullptr;
+                    }
                     
                     // Конвертируем BGR в RGB
                     image_data[dst_offset + 0] = row[src_offset + 2]; // R
@@ -167,18 +215,62 @@ namespace BMPHandler
         }
 
         // Вычисляем размер строки с учетом выравнивания (должно быть кратно 4 байтам)
-        const int row_size = ((width * 3 + 3) / 4) * 4;
-        const size_t image_data_size = static_cast<size_t>(row_size) * static_cast<size_t>(height);
-        const uint32_t data_offset = sizeof(BMPHeader) + sizeof(BMPInfoHeader);
-        const uint32_t file_size = data_offset + static_cast<uint32_t>(image_data_size);
+        size_t width_3 = 0;
+        size_t width_3_plus_3 = 0;
+        if (!SafeMath::safeMultiply(static_cast<size_t>(width), static_cast<size_t>(3), width_3) ||
+            !SafeMath::safeAdd(width_3, static_cast<size_t>(3), width_3_plus_3))
+        {
+            return false;
+        }
+        
+        size_t row_size_unpadded = 0;
+        if (!SafeMath::safeDivide(width_3_plus_3, static_cast<size_t>(4), row_size_unpadded))
+        {
+            return false;
+        }
+        
+        size_t row_size = 0;
+        if (!SafeMath::safeMultiply(row_size_unpadded, static_cast<size_t>(4), row_size))
+        {
+            return false;
+        }
+        
+        size_t image_data_size = 0;
+        if (!SafeMath::safeMultiply(row_size, static_cast<size_t>(height), image_data_size))
+        {
+            return false;
+        }
+        
+        size_t data_offset = 0;
+        if (!SafeMath::safeAdd(static_cast<size_t>(sizeof(BMPHeader)), static_cast<size_t>(sizeof(BMPInfoHeader)), data_offset))
+        {
+            return false;
+        }
+        
+        size_t file_size = 0;
+        if (!SafeMath::safeAdd(data_offset, image_data_size, file_size))
+        {
+            return false;
+        }
+        
+        // Проверяем, что размеры помещаются в uint32_t
+        if (file_size > std::numeric_limits<uint32_t>::max() || 
+            image_data_size > std::numeric_limits<uint32_t>::max() ||
+            data_offset > std::numeric_limits<uint32_t>::max())
+        {
+            return false;
+        }
+        
+        const uint32_t data_offset_u32 = static_cast<uint32_t>(data_offset);
+        const uint32_t file_size_u32 = static_cast<uint32_t>(file_size);
 
         // Записываем заголовок
         BMPHeader header;
         header.signature = 0x4D42; // "BM"
-        header.file_size = file_size;
+        header.file_size = file_size_u32;
         header.reserved1 = 0;
         header.reserved2 = 0;
-        header.data_offset = data_offset;
+        header.data_offset = data_offset_u32;
         
         file.write(reinterpret_cast<const char*>(&header), sizeof(header));
         if (!file.good())
@@ -214,8 +306,17 @@ namespace BMPHandler
             // Копируем и конвертируем RGB в BGR
             for (int x = 0; x < width; ++x)
             {
-                const size_t src_offset = (static_cast<size_t>(y) * static_cast<size_t>(width) + static_cast<size_t>(x)) * static_cast<size_t>(channels);
-                const size_t dst_offset = static_cast<size_t>(x) * 3;
+                size_t y_width_sum = 0;
+                size_t pixel_index = 0;
+                size_t src_offset = 0;
+                size_t dst_offset = 0;
+                if (!SafeMath::safeMultiply(static_cast<size_t>(y), static_cast<size_t>(width), y_width_sum) ||
+                    !SafeMath::safeAdd(y_width_sum, static_cast<size_t>(x), pixel_index) ||
+                    !SafeMath::safeMultiply(pixel_index, static_cast<size_t>(channels), src_offset) ||
+                    !SafeMath::safeMultiply(static_cast<size_t>(x), static_cast<size_t>(3), dst_offset))
+                {
+                    return false;
+                }
                 
                 // Конвертируем RGB в BGR
                 if (channels >= 3)

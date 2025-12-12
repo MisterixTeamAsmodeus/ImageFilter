@@ -2,47 +2,27 @@
 #include <ImageProcessor.h>
 #include <utils/ParallelImageProcessor.h>
 #include <utils/FilterResult.h>
+#include <utils/FilterValidator.h>
+#include <utils/FilterValidationHelper.h>
+#include <utils/ColorConversionUtils.h>
 #include <algorithm>
 
 FilterResult SaturationFilter::apply(ImageProcessor& image)
 {
-    if (!image.isValid())
+    // Валидация параметра фильтра
+    auto factor_result = FilterValidator::validateFactor(factor_, 0.0);
+    
+    // Валидация изображения и параметра с автоматическим добавлением контекста
+    auto validation_result = FilterValidationHelper::validateImageAndParam(
+        image, factor_result, "factor", factor_);
+    if (validation_result.hasError())
     {
-        return FilterResult::failure(FilterError::InvalidImage, "Изображение не загружено");
+        return validation_result;
     }
 
     const auto width = image.getWidth();
     const auto height = image.getHeight();
     const auto channels = image.getChannels();
-
-    // Валидация размеров изображения
-    if (width <= 0 || height <= 0)
-    {
-        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
-        ctx.filter_params = "factor=" + std::to_string(factor_);
-        return FilterResult::failure(FilterError::InvalidSize,
-                                     "Размер изображения должен быть больше нуля", ctx);
-    }
-
-    if (channels != 3 && channels != 4)
-    {
-        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
-        ctx.filter_params = "factor=" + std::to_string(factor_);
-        return FilterResult::failure(FilterError::InvalidChannels, 
-                                     "Ожидается 3 канала (RGB) или 4 канала (RGBA), получено: " + std::to_string(channels),
-                                     ctx);
-    }
-
-    // Валидация параметра фильтра
-    if (factor_ < 0.0)
-    {
-        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
-        ctx.filter_params = "factor=" + std::to_string(factor_);
-        return FilterResult::failure(FilterError::InvalidFactor,
-                                     "Коэффициент насыщенности должен быть >= 0, получено: " + std::to_string(factor_),
-                                     ctx);
-    }
-
     auto* data = image.getData();
     const auto factor = static_cast<int>(factor_ * 65536); // Масштабируем для целочисленной арифметики
 
@@ -56,18 +36,14 @@ FilterResult SaturationFilter::apply(ImageProcessor& image)
 
                 for (int x = 0; x < width; ++x)
                 {
-                    // Коэффициенты для преобразования RGB в градации серого
-                    constexpr int R_COEFF = 19595; // 0.299 * 65536
-                    constexpr int G_COEFF = 38470; // 0.587 * 65536
-                    constexpr int B_COEFF = 7471; // 0.114 * 65536
                     const auto pixel_offset = row_offset + static_cast<size_t>(x) * static_cast<size_t>(channels);
 
                     const auto r = static_cast<int>(data[pixel_offset + 0]);
                     const auto g = static_cast<int>(data[pixel_offset + 1]);
                     const auto b = static_cast<int>(data[pixel_offset + 2]);
 
-                    // Вычисляем яркость (градации серого)
-                    const auto gray = (R_COEFF * r + G_COEFF * g + B_COEFF * b) >> 16;
+                    // Вычисляем яркость (градации серого) используя общую утилиту
+                    const auto gray = ColorConversionUtils::rgbToGrayscaleInt(r, g, b);
 
                     // Интерполируем между серым и оригинальным цветом
                     const auto new_r = gray + (((r - gray) * factor) >> 16);

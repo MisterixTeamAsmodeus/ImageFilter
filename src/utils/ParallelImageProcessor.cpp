@@ -66,32 +66,36 @@ void ParallelImageProcessor::processRowsParallel(
         pool = local_pool.get();
     }
 
-    // Вычисляем количество строк на поток
-    const auto rows_per_thread = (height + adaptive_threads - 1) / adaptive_threads;
+    // Вычисляем базовое количество строк на поток и остаток
+    // Остаток распределяем по первым потокам, чтобы все строки были обработаны
+    const int base_rows_per_thread = height / adaptive_threads;
+    const int remainder = height % adaptive_threads;
 
-    // Создаем вектор индексов диапазонов для использования с std::execution::par_unseq
-    // Использование std::execution::par_unseq позволяет компилятору использовать
-    // векторные инструкции (SIMD) где возможно, улучшая производительность
-    std::vector<int> range_indices;
-    range_indices.reserve(static_cast<size_t>(adaptive_threads));
-    
+    // Создаем задачи для каждого потока
+    // Первые remainder потоков получают на одну строку больше
     for (int i = 0; i < adaptive_threads; ++i)
     {
-        const auto start_row = i * rows_per_thread;
-        if (start_row < height)
+        // Вычисляем начало диапазона для текущего потока
+        int start_row = i * base_rows_per_thread + std::min(i, remainder);
+        // Вычисляем конец диапазона
+        int end_row = start_row + base_rows_per_thread;
+        // Первые remainder потоков получают дополнительную строку
+        if (i < remainder)
         {
-            range_indices.push_back(i);
+            end_row += 1;
         }
-    }
-
-    // Используем std::execution::par_unseq для планирования задач
-    // Это позволяет компилятору оптимизировать планирование и использовать
-    // векторные инструкции где возможно, при этом задачи выполняются через ThreadPool
-    for (const int i : range_indices)
-    {
-        // Вычисляем значения заранее для правильного захвата
-        const int start_row = i * rows_per_thread;
-        const int end_row = (start_row + rows_per_thread < height) ? (start_row + rows_per_thread) : height;
+        
+        // Проверяем, что диапазон не выходит за границы
+        if (start_row >= height)
+        {
+            break;  // Больше нет строк для обработки
+        }
+        
+        // Ограничиваем end_row высотой изображения
+        if (end_row > height)
+        {
+            end_row = height;
+        }
         
         // Добавляем задачу в ThreadPool для переиспользования потоков
         // Захватываем все переменные явно по значению, включая processRowRange

@@ -51,5 +51,23 @@ public:
      * @return size_t Общее количество буферов в пуле
      */
     virtual size_t size() const = 0;
+
+    /**
+     * @brief Получить общий объем памяти, зарезервированной в пуле
+     * 
+     * @return size_t Общий объем памяти в байтах (сумма capacity всех буферов)
+     */
+    virtual size_t getTotalMemory() const = 0;
+
+    /**
+     * @brief Получить статистику использования пула
+     * 
+     * @param total_buffers Количество буферов в пуле
+     * @param total_memory Общий объем зарезервированной памяти в байтах
+     * @param largest_buffer Размер самого большого буфера в байтах
+     * @param smallest_buffer Размер самого маленького буфера в байтах
+     */
+    virtual void getStats(size_t& total_buffers, size_t& total_memory, 
+                         size_t& largest_buffer, size_t& smallest_buffer) const = 0;
 };
 

@@ -2,6 +2,8 @@
 #include <mutex>
 #include <numbers>
 #include <utils/LookupTables.h>
+#include <utils/CacheManager.h>
+#include <algorithm>
 
 namespace {
 // Константы размеров таблиц (соответствуют константам в LookupTables)
@@ -236,4 +238,79 @@ int32_t LookupTables::sqrtIntScaled(int x) noexcept {
 
     // Для значений вне таблицы вычисляем и масштабируем
     return static_cast<int32_t>(std::sqrt(static_cast<double>(x)) * 65536.0);
+}
+
+std::vector<uint8_t> LookupTables::getGammaLUT(double gamma) noexcept
+{
+    if (gamma <= 0.0)
+    {
+        gamma = 1.0;  // Нормализуем некорректные значения
+    }
+    
+    LUTCacheKey key;
+    key.type = LUTCacheKey::Type::Gamma;
+    key.parameter = gamma;
+    
+    auto& cache_manager = CacheManager::getInstance();
+    return cache_manager.getOrGenerateLUT(key, [gamma]() {
+        std::vector<uint8_t> lut(256);
+        const double inv_gamma = 1.0 / gamma;
+        for (int i = 0; i < 256; ++i)
+        {
+            const double normalized = static_cast<double>(i) / 255.0;
+            const double corrected = std::pow(normalized, inv_gamma);
+            lut[static_cast<size_t>(i)] = static_cast<uint8_t>(
+                std::max(0.0, std::min(255.0, corrected * 255.0)));
+        }
+        return lut;
+    });
+}
+
+std::vector<uint8_t> LookupTables::getBrightnessLUT(double brightness) noexcept
+{
+    // Ограничиваем диапазон [-1.0, 1.0]
+    brightness = std::max(-1.0, std::min(1.0, brightness));
+    
+    LUTCacheKey key;
+    key.type = LUTCacheKey::Type::Brightness;
+    key.parameter = brightness;
+    
+    auto& cache_manager = CacheManager::getInstance();
+    return cache_manager.getOrGenerateLUT(key, [brightness]() {
+        std::vector<uint8_t> lut(256);
+        const double factor = 1.0 + brightness;
+        for (int i = 0; i < 256; ++i)
+        {
+            const double value = static_cast<double>(i) * factor;
+            lut[static_cast<size_t>(i)] = static_cast<uint8_t>(
+                std::max(0.0, std::min(255.0, value)));
+        }
+        return lut;
+    });
+}
+
+std::vector<uint8_t> LookupTables::getContrastLUT(double contrast) noexcept
+{
+    // Ограничиваем диапазон [-1.0, 1.0]
+    contrast = std::max(-1.0, std::min(1.0, contrast));
+    
+    LUTCacheKey key;
+    key.type = LUTCacheKey::Type::Contrast;
+    key.parameter = contrast;
+    
+    auto& cache_manager = CacheManager::getInstance();
+    return cache_manager.getOrGenerateLUT(key, [contrast]() {
+        std::vector<uint8_t> lut(256);
+        // Преобразуем контраст из [-1, 1] в множитель
+        const double factor = (1.0 + contrast) / (1.0 - contrast);
+        const double offset = 128.0 * (1.0 - factor);
+        
+        for (int i = 0; i < 256; ++i)
+        {
+            const double value = static_cast<double>(i) * factor + offset;
+            lut[static_cast<size_t>(i)] = static_cast<uint8_t>(
+                std::max(0.0, std::min(255.0, value)));
+        }
+        return lut;
+    });
 }

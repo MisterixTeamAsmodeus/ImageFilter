@@ -2,48 +2,29 @@
 #include <ImageProcessor.h>
 #include <utils/ParallelImageProcessor.h>
 #include <utils/FilterResult.h>
+#include <utils/FilterValidator.h>
+#include <utils/FilterValidationHelper.h>
+#include <utils/PixelOffsetUtils.h>
+#include <utils/SafeMath.h>
 #include <algorithm>
 #include <random>
 
 FilterResult NoiseFilter::apply(ImageProcessor& image)
 {
-    if (!image.isValid())
+    // Валидация параметра фильтра
+    auto intensity_result = FilterValidator::validateIntensity(intensity_);
+    
+    // Валидация изображения и параметра с автоматическим добавлением контекста
+    auto validation_result = FilterValidationHelper::validateImageAndParam(
+        image, intensity_result, "intensity", intensity_);
+    if (validation_result.hasError())
     {
-        return FilterResult::failure(FilterError::InvalidImage, "Изображение не загружено");
+        return validation_result;
     }
 
     const auto width = image.getWidth();
     const auto height = image.getHeight();
     const auto channels = image.getChannels();
-
-    // Валидация размеров изображения
-    if (width <= 0 || height <= 0)
-    {
-        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
-        ctx.filter_params = "intensity=" + std::to_string(intensity_);
-        return FilterResult::failure(FilterError::InvalidSize,
-                                     "Размер изображения должен быть больше нуля", ctx);
-    }
-
-    if (channels != 3 && channels != 4)
-    {
-        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
-        ctx.filter_params = "intensity=" + std::to_string(intensity_);
-        return FilterResult::failure(FilterError::InvalidChannels, 
-                                     "Ожидается 3 канала (RGB) или 4 канала (RGBA), получено: " + std::to_string(channels),
-                                     ctx);
-    }
-    
-    // Валидация параметра фильтра
-    if (intensity_ < 0.0 || intensity_ > 1.0)
-    {
-        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
-        ctx.filter_params = "intensity=" + std::to_string(intensity_);
-        return FilterResult::failure(FilterError::ParameterOutOfRange, 
-                                     "Интенсивность должна быть в диапазоне [0.0, 1.0], получено: " + std::to_string(intensity_),
-                                     ctx);
-    }
-
     auto* data = image.getData();
     const auto max_noise = static_cast<int>(intensity_ * 255);
 
@@ -57,18 +38,49 @@ FilterResult NoiseFilter::apply(ImageProcessor& image)
 
             for (int y = start_row; y < end_row; ++y)
             {
-                const auto row_offset = static_cast<size_t>(y) * static_cast<size_t>(width) * static_cast<size_t>(channels);
+                // Вычисляем смещение строки с защитой от переполнения
+                size_t row_offset = 0;
+                if (!PixelOffsetUtils::computeRowOffset(y, width, channels, row_offset))
+                {
+                    // Пропускаем строку при переполнении
+                    continue;
+                }
 
                 for (int x = 0; x < width; ++x)
                 {
-                    const auto pixel_offset = row_offset + static_cast<size_t>(x) * static_cast<size_t>(channels);
+                    // Вычисляем смещение пикселя с защитой от переполнения
+                    size_t pixel_offset = 0;
+                    if (!PixelOffsetUtils::computePixelOffset(row_offset, x, channels, pixel_offset))
+                    {
+                        // Пропускаем пиксель при переполнении
+                        continue;
+                    }
 
                     for (int c = 0; c < channels; ++c)
                     {
-                        const auto old_value = static_cast<int>(data[pixel_offset + static_cast<size_t>(c)]);
+                        size_t channel_offset = 0;
+                        if (!PixelOffsetUtils::computeChannelOffset(pixel_offset, c, channel_offset))
+                        {
+                            continue; // Пропускаем при переполнении
+                        }
+                        
+                        // Проверка границ
+                        const size_t row_end = row_offset + static_cast<size_t>(width) * static_cast<size_t>(channels);
+                        if (channel_offset >= row_end)
+                        {
+                            continue; // Защита от выхода за границы
+                        }
+                        
+                        const auto old_value = static_cast<int>(data[channel_offset]);
                         const auto noise = local_dist(local_gen);
-                        const auto new_value = old_value + noise;
-                        data[pixel_offset + static_cast<size_t>(c)] = static_cast<uint8_t>(std::max(0, std::min(255, new_value)));
+                        // Проверка на переполнение при сложении
+                        int new_value = 0;
+                        if (!SafeMath::safeAdd(old_value, noise, new_value))
+                        {
+                            // При переполнении ограничиваем значение
+                            new_value = (noise > 0) ? 255 : 0;
+                        }
+                        data[channel_offset] = static_cast<uint8_t>(std::max(0, std::min(255, new_value)));
                     }
                 }
             }

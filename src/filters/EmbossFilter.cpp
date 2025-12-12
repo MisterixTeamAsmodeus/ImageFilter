@@ -2,48 +2,63 @@
 #include <ImageProcessor.h>
 #include <utils/ParallelImageProcessor.h>
 #include <utils/FilterResult.h>
+#include <utils/FilterValidator.h>
+#include <utils/FilterValidationHelper.h>
 #include <utils/BorderHandler.h>
+#include <utils/SafeMath.h>
 #include <algorithm>
 #include <vector>
 
 FilterResult EmbossFilter::apply(ImageProcessor& image)
 {
-    if (!image.isValid())
+    // Валидация параметра фильтра
+    auto strength_result = FilterValidator::validateFactor(strength_, 0.0);
+    
+    // Валидация изображения и параметра с автоматическим добавлением контекста
+    auto validation_result = FilterValidationHelper::validateImageAndParam(
+        image, strength_result, "strength", strength_);
+    if (validation_result.hasError())
     {
-        return FilterResult::failure(FilterError::InvalidImage, "Изображение не загружено");
+        return validation_result;
     }
 
     const auto width = image.getWidth();
     const auto height = image.getHeight();
     const auto channels = image.getChannels();
-
-    // Валидация размеров изображения
-    if (width <= 0 || height <= 0)
-    {
-        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
-        return FilterResult::failure(FilterError::InvalidSize,
-                                     "Размер изображения должен быть больше нуля", ctx);
-    }
-
-    if (channels != 3 && channels != 4)
-    {
-        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
-        return FilterResult::failure(FilterError::InvalidChannels, 
-                                     "Ожидается 3 канала (RGB) или 4 канала (RGBA), получено: " + std::to_string(channels),
-                                     ctx);
-    }
-
     const auto* input_data = image.getData();
-    const auto buffer_size = static_cast<size_t>(width) * static_cast<size_t>(height) * static_cast<size_t>(channels);
+    size_t width_height_product = 0;
+    size_t buffer_size = 0;
+    if (!SafeMath::safeMultiply(static_cast<size_t>(width), static_cast<size_t>(height), width_height_product) ||
+        !SafeMath::safeMultiply(width_height_product, static_cast<size_t>(channels), buffer_size))
+    {
+        ErrorContext ctx = ErrorContext::withImage(width, height, channels);
+        ctx.withFilterParam("strength", strength_);
+        return FilterResult::failure(FilterError::ArithmeticOverflow, 
+                                   "Размер изображения слишком большой", ctx);
+    }
     
     // Создаем буфер для результата
     std::vector<uint8_t> result(buffer_size);
 
+    // Базовое ядро рельефа при strength = 1.0:
+    //  -2  -1   0
+    //  -1   1   1
+    //   0   1   2
+    //
+    // При strength != 1.0 ядро масштабируется для плавной регулировки эффекта
+    constexpr int BASE_KERNEL[3][3] = {
+        {-2, -1, 0},
+        {-1, 1, 1},
+        {0, 1, 2}
+    };
+
+    // Сохраняем strength в локальную переменную для захвата в лямбде
+    const double strength = strength_;
 
     ParallelImageProcessor::processRowsParallel(
         height,
         width,
-        [width, height, channels, input_data, &result, this](int start_row, int end_row)
+        [width, height, channels, input_data, &result, strength, this](int start_row, int end_row)
         {
             for (int y = start_row; y < end_row; ++y)
             {
@@ -51,19 +66,13 @@ FilterResult EmbossFilter::apply(ImageProcessor& image)
                 {
                     for (int c = 0; c < channels; ++c)
                     {
-                        int sum = 0;
+                        double sum = 0.0;
 
-                        // Применяем ядро рельефа
+                        // Применяем ядро рельефа с учетом силы эффекта
                         for (int ky = -1; ky <= 1; ++ky)
                         {
                             for (int kx = -1; kx <= 1; ++kx)
                             {
-                                // Ядро рельефа (emboss kernel)
-                                constexpr int emboss_kernel[3][3] = {
-                                    {-2, -1, 0},
-                                    {-1, 1, 1},
-                                    {0, 1, 2}
-                                };
                                 const auto px = x + kx;
                                 const auto py = y + ky;
 
@@ -73,14 +82,21 @@ FilterResult EmbossFilter::apply(ImageProcessor& image)
 
                                 const auto pixel_offset = (static_cast<size_t>(clamped_y) * static_cast<size_t>(width) + static_cast<size_t>(clamped_x)) *
                                     static_cast<size_t>(channels) + static_cast<size_t>(c);
-                                sum += static_cast<int>(input_data[pixel_offset]) * emboss_kernel[ky + 1][kx + 1];
+                                
+                                // Масштабируем ядро на силу эффекта
+                                const auto kernel_value = BASE_KERNEL[ky + 1][kx + 1] * strength;
+                                sum += static_cast<double>(input_data[pixel_offset]) * kernel_value;
                             }
                         }
 
                         // Добавляем 128 для смещения в средний диапазон
-                        const auto value = sum + 128;
+                        // При strength = 0, результат будет близок к исходному изображению
+                        const auto base_value = static_cast<double>(input_data[(static_cast<size_t>(y) * static_cast<size_t>(width) + static_cast<size_t>(x)) * static_cast<size_t>(channels) + static_cast<size_t>(c)]);
+                        const auto embossed_value = sum + 128.0;
+                        // Интерполируем между исходным и обработанным значением в зависимости от strength
+                        const auto value = base_value * (1.0 - strength) + embossed_value * strength;
                         const auto pixel_offset = (static_cast<size_t>(y) * static_cast<size_t>(width) + static_cast<size_t>(x)) * static_cast<size_t>(channels) + static_cast<size_t>(c);
-                        result[pixel_offset] = static_cast<uint8_t>(std::max(0, std::min(255, value)));
+                        result[pixel_offset] = static_cast<uint8_t>(std::max(0.0, std::min(255.0, value)));
                     }
                 }
             }

@@ -3,6 +3,9 @@
 #include <filters/IFilter.h>
 #include <utils/BorderHandler.h>
 
+// Forward declaration
+class IBufferPool;
+
 /**
  * @brief Фильтр размытия по прямоугольнику (Box Blur)
  * 
@@ -17,10 +20,12 @@ public:
      * @param radius Радиус размытия (размер окна = 2*radius + 1, по умолчанию 5)
      *               Должен быть >= 0. При некорректном значении используется 5
      * @param borderStrategy Стратегия обработки границ (по умолчанию Mirror)
+     * @param buffer_pool Пул буферов для переиспользования временных буферов (опционально)
      */
     explicit BoxBlurFilter(int radius = 5, 
-                           BorderHandler::Strategy borderStrategy = BorderHandler::Strategy::Mirror) 
-        : radius_(radius >= 0 ? radius : 5), border_handler_(borderStrategy) {}
+                           BorderHandler::Strategy borderStrategy = BorderHandler::Strategy::Mirror,
+                           IBufferPool* buffer_pool = nullptr) 
+        : radius_(radius >= 0 ? radius : 5), border_handler_(borderStrategy), buffer_pool_(buffer_pool) {}
 
     /**
      * @brief Применяет фильтр размытия по прямоугольнику к изображению
@@ -36,6 +41,7 @@ public:
 private:
     int radius_;  // Радиус размытия
     BorderHandler border_handler_;  // Обработчик границ
+    IBufferPool* buffer_pool_;  // Пул буферов для переиспользования (может быть nullptr)
 };
 
 

@@ -15,6 +15,18 @@ class ImageProcessor;
  * - Использует виртуальный деструктор для корректного удаления объектов через указатель на базовый класс
  * - Позволяет работать с фильтрами через указатели на интерфейс (паттерн Strategy)
  * - Использует FilterResult для структурированной обработки ошибок
+ * 
+ * @example example_filter_usage.cpp
+ * Пример использования фильтров:
+ * @code{.cpp}
+ * auto filter = FilterFactory::getInstance().create("grayscale", app);
+ * if (filter) {
+ *     filter->apply(processor);
+ * }
+ * @endcode
+ * 
+ * @example example_custom_filter.cpp
+ * Пример создания пользовательского фильтра, наследующегося от IFilter
  */
 class IFilter {
 public:
@@ -50,6 +62,16 @@ public:
      * @return Строка с категорией (например, "Цветовой", "Геометрический", "Края и детали", "Размытие и шум", "Стилистический")
      */
     [[nodiscard]] virtual std::string getCategory() const = 0;
+
+    /**
+     * @brief Проверяет, может ли фильтр работать in-place (изменять данные напрямую без копирования)
+     * 
+     * In-place обработка возможна, если фильтр не требует чтения исходных значений соседних пикселей
+     * во время записи результата. Это позволяет избежать создания временных буферов и копирования данных.
+     * 
+     * @return true если фильтр может работать in-place, false если требуется копирование данных
+     */
+    [[nodiscard]] virtual bool supportsInPlace() const noexcept { return false; }
 
 };
 

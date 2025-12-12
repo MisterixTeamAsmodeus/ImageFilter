@@ -35,7 +35,7 @@ TEST_F(LargeImageTest, VeryLargeImageGrayscale)
     ASSERT_NE(allocated_data, nullptr);
     std::memcpy(allocated_data, test_image.data(), test_image.size());
     
-    ASSERT_TRUE(processor.resize(width, height, allocated_data));
+    ASSERT_TRUE(processor.resize(width, height, allocated_data).isSuccess());
     
     GrayscaleFilter filter;
     const auto result = filter.apply(processor);
@@ -57,7 +57,7 @@ TEST_F(LargeImageTest, VeryLargeImageBlur)
     ASSERT_NE(allocated_data, nullptr);
     std::memcpy(allocated_data, test_image.data(), test_image.size());
     
-    ASSERT_TRUE(processor.resize(width, height, allocated_data));
+    ASSERT_TRUE(processor.resize(width, height, allocated_data).isSuccess());
     
     GaussianBlurFilter filter(2.0);
     const auto result = filter.apply(processor);
@@ -97,7 +97,7 @@ TEST_F(ErrorHandlingTest, InvalidFilterParameters)
     ASSERT_NE(allocated_data, nullptr);
     std::memcpy(allocated_data, test_image.data(), test_image.size());
     
-    ASSERT_TRUE(processor.resize(width, height, allocated_data));
+    ASSERT_TRUE(processor.resize(width, height, allocated_data).isSuccess());
     
     // Конструктор GaussianBlurFilter нормализует radius <= 0.0 до 5.0
     // Поэтому передача 0.0 или отрицательного значения не вызовет ошибку в apply()
@@ -132,7 +132,7 @@ TEST_F(ThreadingTest, ParallelProcessingLargeImage)
     ASSERT_NE(allocated_data, nullptr);
     std::memcpy(allocated_data, test_image.data(), test_image.size());
     
-    ASSERT_TRUE(processor.resize(width, height, allocated_data));
+    ASSERT_TRUE(processor.resize(width, height, allocated_data).isSuccess());
     
     // Применяем фильтр, который использует параллельную обработку
     GrayscaleFilter filter;
@@ -153,7 +153,7 @@ TEST_F(ThreadingTest, MultipleFiltersSequentially)
     ASSERT_NE(allocated_data, nullptr);
     std::memcpy(allocated_data, test_image.data(), test_image.size());
     
-    ASSERT_TRUE(processor.resize(width, height, allocated_data));
+    ASSERT_TRUE(processor.resize(width, height, allocated_data).isSuccess());
     
     // Применяем несколько фильтров подряд
     GrayscaleFilter grayscale;
@@ -185,7 +185,7 @@ TEST_F(BoundaryValueTest, MinimumBlurRadius)
     ASSERT_NE(allocated_data, nullptr);
     std::memcpy(allocated_data, test_image.data(), test_image.size());
     
-    ASSERT_TRUE(processor.resize(width, height, allocated_data));
+    ASSERT_TRUE(processor.resize(width, height, allocated_data).isSuccess());
     
     // Минимальный валидный радиус
     GaussianBlurFilter filter(0.1);
@@ -204,7 +204,7 @@ TEST_F(BoundaryValueTest, MaximumBlurRadius)
     ASSERT_NE(allocated_data, nullptr);
     std::memcpy(allocated_data, test_image.data(), test_image.size());
     
-    ASSERT_TRUE(processor.resize(width, height, allocated_data));
+    ASSERT_TRUE(processor.resize(width, height, allocated_data).isSuccess());
     
     // Большой радиус размытия
     GaussianBlurFilter filter(50.0);
@@ -224,7 +224,7 @@ TEST_F(BoundaryValueTest, ExtremeAspectRatio)
     ASSERT_NE(allocated_data, nullptr);
     std::memcpy(allocated_data, test_image.data(), test_image.size());
     
-    ASSERT_TRUE(processor.resize(width, height, allocated_data));
+    ASSERT_TRUE(processor.resize(width, height, allocated_data).isSuccess());
     
     GrayscaleFilter filter;
     const auto result = filter.apply(processor);
@@ -243,7 +243,7 @@ TEST_F(BoundaryValueTest, SquareImage)
     ASSERT_NE(allocated_data, nullptr);
     std::memcpy(allocated_data, test_image.data(), test_image.size());
     
-    ASSERT_TRUE(processor.resize(size, size, allocated_data));
+    ASSERT_TRUE(processor.resize(size, size, allocated_data).isSuccess());
     
     GrayscaleFilter filter;
     const auto result = filter.apply(processor);
