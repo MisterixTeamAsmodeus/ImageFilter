@@ -50,7 +50,13 @@ add_library(${PROJECT_NAME} STATIC
         src/utils/FileSystemHelper.cpp
 )
 
-find_package(stb REQUIRED)
+
+# Используем стандартный путь vcpkg для заголовков
+find_path(STB_INCLUDE_DIR
+    NAMES stb_image.h
+    PATHS
+        ${CMAKE_PREFIX_PATH}/include
+)
 
 # Общедоступные заголовки библиотеки
 target_include_directories(${PROJECT_NAME}
@@ -58,7 +64,7 @@ target_include_directories(${PROJECT_NAME}
         ${CMAKE_CURRENT_SOURCE_DIR}/include/ImageFilter
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${stb_SOURCE_DIR}
+        ${STB_INCLUDE_DIR}
 )
 
 set_target_properties(${PROJECT_NAME} PROPERTIES

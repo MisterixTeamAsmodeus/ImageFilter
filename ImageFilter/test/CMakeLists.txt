@@ -6,9 +6,13 @@ add_executable(${PROJECT_NAME}
     ColorSpaceConverterTests.cpp
 )
 
-target_include_directories(${PROJECT_NAME} PRIVATE
-    ${stb_SOURCE_DIR}
-)
+# Stb должен быть доступен через ImageFilterLib, но для тестов может понадобиться прямой доступ
+# Получаем путь к Stb из родительского проекта
+if(DEFINED STB_INCLUDE_DIR)
+    target_include_directories(${PROJECT_NAME} PRIVATE
+        ${STB_INCLUDE_DIR}
+    )
+endif()
 
 target_link_libraries(${PROJECT_NAME}
     PRIVATE

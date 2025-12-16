@@ -5,12 +5,6 @@ add_executable(${PROJECT_NAME}
     ImageProcessingHelperTests.cpp
 )
 
-target_include_directories(${PROJECT_NAME} PRIVATE
-    ${stb_SOURCE_DIR}
-    ${CLI11_SOURCE_DIR}/include
-    ${json_SOURCE_DIR}/include
-)
-
 target_link_libraries(${PROJECT_NAME}
     PRIVATE
         ImageFilterLib

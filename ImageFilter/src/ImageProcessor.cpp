@@ -193,76 +193,12 @@ FilterResult ImageProcessor::convertToRGB()
     return FilterResult::success();
 }
 
-FilterResult ImageProcessor::resize(int new_width, int new_height, uint8_t* new_data)
+FilterResult ImageProcessor::resize(int new_width, int new_height, const uint8_t* new_data)
 {
-    if (new_width <= 0 || new_height <= 0)
-    {
-        ErrorContext ctx = ErrorContext::withImage(new_width, new_height, channels_);
-        return FilterResult::failure(FilterError::InvalidSize, 
-                                   "Некорректный размер изображения", ctx);
-    }
-
-    if (channels_ == 0)
-    {
-        channels_ = 3; // Устанавливаем каналы по умолчанию
-    }
-
-    // Проверка на переполнение при вычислении размера
-    size_t width_height_product = 0;
-    if (!SafeMath::safeMultiply(static_cast<size_t>(new_width), static_cast<size_t>(new_height), width_height_product))
-    {
-        ErrorContext ctx = ErrorContext::withImage(new_width, new_height, channels_);
-        return FilterResult::failure(FilterError::ArithmeticOverflow, 
-                                   "Размер изображения слишком большой", ctx);
-    }
-
-    size_t new_size = 0;
-    if (!SafeMath::safeMultiply(width_height_product, static_cast<size_t>(channels_), new_size))
-    {
-        ErrorContext ctx = ErrorContext::withImage(new_width, new_height, channels_);
-        return FilterResult::failure(FilterError::ArithmeticOverflow, 
-                                   "Размер изображения слишком большой", ctx);
-    }
-
-    if (new_data == nullptr)
-    {
-        // Просто освобождаем старое изображение и устанавливаем новые размеры
-        stbi_image_free(data_);
-        data_ = nullptr;
-        width_ = new_width;
-        height_ = new_height;
-        return FilterResult::success();
-    }
-
-    // Выделяем новую память через malloc (совместимо с stbi_image_free)
-    auto* allocated_data = static_cast<uint8_t*>(std::malloc(new_size));
-    if (allocated_data == nullptr)
-    {
-        const int errno_code = errno;
-        ErrorContext ctx = ErrorContext::withImage(new_width, new_height, channels_);
-        if (errno_code != 0)
-        {
-            ctx.system_error_code = errno_code;
-        }
-        return FilterResult::failure(FilterError::OutOfMemory, 
-                                   "Недостаточно памяти для изменения размера", ctx);
-    }
-
-    // Копируем данные из переданного буфера
-    std::memcpy(allocated_data, new_data, new_size);
-
-    // Освобождаем старые данные
-    stbi_image_free(data_);
-
-    // Устанавливаем новые данные и размеры
-    data_ = allocated_data;
-    width_ = new_width;
-    height_ = new_height;
-
-    return FilterResult::success();
+    return resize(new_width, new_height, channels_ == 0 ? 3 : channels_, new_data);
 }
 
-FilterResult ImageProcessor::resize(int new_width, int new_height, int new_channels, uint8_t* new_data)
+FilterResult ImageProcessor::resize(int new_width, int new_height, int new_channels, const uint8_t* new_data)
 {
     if (new_width <= 0 || new_height <= 0 || (new_channels != 3 && new_channels != 4))
     {

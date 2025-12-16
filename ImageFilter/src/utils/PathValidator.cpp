@@ -184,12 +184,15 @@ namespace PathValidator
     {
         try
         {
-            if (!fs::exists(filepath) || !fs::is_regular_file(filepath))
+            // Создаем fs::path из строки (поддерживает UTF-8 на Windows)
+            const fs::path path(filepath);
+            
+            if (!fs::exists(path) || !fs::is_regular_file(path))
             {
                 return 0;
             }
 
-            return static_cast<uint64_t>(fs::file_size(filepath));
+            return static_cast<uint64_t>(fs::file_size(path));
         }
         catch (...)
         {

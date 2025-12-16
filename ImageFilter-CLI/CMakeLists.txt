@@ -19,22 +19,21 @@ add_executable(${PROJECT_NAME}
         main.cpp
 )
 
-# Добавляем CLI11 для парсинга аргументов командной строки
-find_package(CLI11)
-# Добавляем nlohmann/json для работы с JSON
-find_package(nlohmann-json)
+# Поиск и подключение CLI11 из vcpkg
+find_package(CLI11 REQUIRED)
 
-# Публичные include-директории для библиотеки, чтобы их видели юнит‑тесты
+# Поиск и подключение nlohmann/json из vcpkg
+find_package(nlohmann_json REQUIRED)
+
+# Публичные include-директории для библиотеки
 target_include_directories(ImageFilterCLI_lib PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}
-        ${stb_SOURCE_DIR}
-        ${CLI11_SOURCE_DIR}/include
-        ${json_SOURCE_DIR}/include
 )
 
-# Библиотека CLI зависит от основной библиотеки фильтров
-target_link_libraries(ImageFilterCLI_lib PUBLIC
+target_link_libraries(ImageFilterCLI_lib PUBLIC 
         ImageFilterLib
+        CLI11::CLI11
+        nlohmann_json
 )
 
 # Исполняемый CLI зависит от своей библиотеки

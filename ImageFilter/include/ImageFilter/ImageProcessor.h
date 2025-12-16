@@ -146,7 +146,7 @@ public:
      * Принимает владение над new_data. Старые данные освобождаются через stbi_image_free.
      * Если new_data == nullptr, то просто освобождается старое изображение и устанавливаются новые размеры.
      */
-    FilterResult resize(int new_width, int new_height, uint8_t* new_data = nullptr);
+    FilterResult resize(int new_width, int new_height, const uint8_t* new_data = nullptr);
 
     /**
      * @brief Изменяет размеры изображения и заменяет данные с указанием количества каналов
@@ -159,7 +159,7 @@ public:
      * Принимает владение над new_data. Старые данные освобождаются через stbi_image_free.
      * Если new_data == nullptr, то просто освобождается старое изображение и устанавливаются новые размеры и каналы.
      */
-    FilterResult resize(int new_width, int new_height, int new_channels, uint8_t* new_data);
+    FilterResult resize(int new_width, int new_height, int new_channels, const uint8_t* new_data);
 
 private:
     /**
