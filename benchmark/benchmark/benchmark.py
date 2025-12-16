@@ -145,8 +145,11 @@ class ImageFilterBenchmark:
         # Создаем отдельную директорию для статистики
         self.statistics_dir.mkdir(parents=True, exist_ok=True)
         
+        # Проверяем существование исполняемого файла и выводим полный путь в сообщении об ошибке
         if not self.executable_path.exists():
-            raise FileNotFoundError(f"Исполняемый файл не найден: {executable_path}")
+            raise FileNotFoundError(
+                f"Исполняемый файл не найден: {self.executable_path.resolve()}"
+            )
         
         if not self.dataset_dir.exists():
             raise FileNotFoundError(f"Директория с датасетом не найдена: {dataset_dir}")

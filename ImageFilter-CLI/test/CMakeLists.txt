@@ -1,0 +1,34 @@
+project(ImageFilterCLITests)
+
+# Исполняемый файл для тестов CLI
+add_executable(${PROJECT_NAME}
+    ImageProcessingHelperTests.cpp
+)
+
+target_include_directories(${PROJECT_NAME} PRIVATE
+    ${stb_SOURCE_DIR}
+    ${CLI11_SOURCE_DIR}/include
+    ${json_SOURCE_DIR}/include
+)
+
+target_link_libraries(${PROJECT_NAME}
+    PRIVATE
+        ImageFilterLib
+        ImageFilterCLI_lib
+        GTest::gtest
+        GTest::gtest_main
+        GTest::gmock
+)
+
+add_test(NAME ${PROJECT_NAME} COMMAND ${PROJECT_NAME})
+
+set_target_properties(${PROJECT_NAME} PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+)
+
+if(IMAGEFILTER_ENABLE_COVERAGE)
+    imagefilter_enable_coverage_for_target(${PROJECT_NAME})
+    imagefilter_enable_coverage_for_target(ImageFilterCLI_lib)
+    imagefilter_enable_coverage_for_target(ImageFilterLib)
+endif()
+

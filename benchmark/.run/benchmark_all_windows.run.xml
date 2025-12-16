@@ -15,7 +15,7 @@
     <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
     <option name="RUN_TOOL" value="" />
     <option name="SCRIPT_NAME" value="./benchmark/benchmark.py" />
-    <option name="PARAMETERS" value="--executable $ContentRoot$/../cmake-build-release/bin/ImageFilter.exe --dataset $ContentRoot$/dataset_all --output $ContentRoot$/benchmark_output_all --iteration 1 --all-combinations" />
+    <option name="PARAMETERS" value="--executable ./../cmake-build-release/bin/ImageFilterCLI.exe --dataset ./dataset_all --output ./benchmark_output_all --iteration 1 --all-combinations" />
     <option name="SHOW_COMMAND_LINE" value="false" />
     <option name="EMULATE_TERMINAL" value="false" />
     <option name="MODULE_MODE" value="false" />
