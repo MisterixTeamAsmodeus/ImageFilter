@@ -71,6 +71,33 @@ add_executable(${PROJECT_NAME}
     gui/filters/SaturationFilterWidget.cpp
     gui/filters/SaturationFilterWidget.h
     gui/filters/SaturationFilterWidget.ui
+    gui/filters/Rotate90FilterWidget.cpp
+    gui/filters/Rotate90FilterWidget.h
+    gui/filters/Rotate90FilterWidget.ui
+    gui/filters/SharpenFilterWidget.cpp
+    gui/filters/SharpenFilterWidget.h
+    gui/filters/SharpenFilterWidget.ui
+    gui/filters/EdgeDetectionFilterWidget.cpp
+    gui/filters/EdgeDetectionFilterWidget.h
+    gui/filters/EdgeDetectionFilterWidget.ui
+    gui/filters/EmbossFilterWidget.cpp
+    gui/filters/EmbossFilterWidget.h
+    gui/filters/EmbossFilterWidget.ui
+    gui/filters/MedianFilterWidget.cpp
+    gui/filters/MedianFilterWidget.h
+    gui/filters/MedianFilterWidget.ui
+    gui/filters/NoiseFilterWidget.cpp
+    gui/filters/NoiseFilterWidget.h
+    gui/filters/NoiseFilterWidget.ui
+    gui/filters/PosterizeFilterWidget.cpp
+    gui/filters/PosterizeFilterWidget.h
+    gui/filters/PosterizeFilterWidget.ui
+    gui/filters/ThresholdFilterWidget.cpp
+    gui/filters/ThresholdFilterWidget.h
+    gui/filters/ThresholdFilterWidget.ui
+    gui/filters/VignetteFilterWidget.cpp
+    gui/filters/VignetteFilterWidget.h
+    gui/filters/VignetteFilterWidget.ui
     gui/MainWindow.cpp
     gui/MainWindow.h
     gui/MainWindow.ui
