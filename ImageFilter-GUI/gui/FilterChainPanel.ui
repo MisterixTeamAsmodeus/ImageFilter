@@ -41,36 +41,39 @@
    </item>
    <item>
     <widget class="QScrollArea" name="scrollArea">
-     <property name="widgetResizable">
-      <bool>true</bool>
+     <property name="verticalScrollBarPolicy">
+      <enum>Qt::ScrollBarAsNeeded</enum>
      </property>
      <property name="horizontalScrollBarPolicy">
       <enum>Qt::ScrollBarAlwaysOff</enum>
      </property>
-     <property name="verticalScrollBarPolicy">
-      <enum>Qt::ScrollBarAsNeeded</enum>
+     <property name="widgetResizable">
+      <bool>true</bool>
      </property>
      <widget class="QWidget" name="filterListWidget">
       <property name="geometry">
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>282</width>
-        <height>561</height>
+        <width>288</width>
+        <height>553</height>
        </rect>
+      </property>
+      <property name="styleSheet">
+       <string notr="true">#filterListWidget {background-color: rgb(190, 190, 190)}</string>
       </property>
       <layout class="QVBoxLayout" name="filterListLayout">
        <property name="spacing">
         <number>5</number>
        </property>
        <property name="leftMargin">
-        <number>0</number>
+        <number>8</number>
        </property>
        <property name="topMargin">
-        <number>0</number>
+        <number>8</number>
        </property>
        <property name="rightMargin">
-        <number>0</number>
+        <number>8</number>
        </property>
        <property name="bottomMargin">
         <number>0</number>
@@ -84,4 +87,3 @@
  <resources/>
  <connections/>
 </ui>
-

@@ -63,7 +63,6 @@ private:
     QString showFilterSelectionDialog();
 
     FilterChainModel* filterChainModel_;    ///< Модель цепочки фильтров
-    QVBoxLayout* filterListLayout_;       ///< Layout для списка фильтров
     std::vector<FilterItemWidget*> filterItemWidgets_;  ///< Виджеты элементов фильтров
     Ui::FilterChainPanel* ui_;            ///< Указатель на UI объект
 };

@@ -1,21 +1,27 @@
 #pragma once
 
-#include <QWidget>
 #include <QString>
 #include <QVariant>
+#include <QWidget>
 #include <map>
+#include <memory>
 #include <string>
+
+namespace Ui {
+class FilterItemWidget;
+}
 
 // Forward declarations
 class QLabel;
 class QPushButton;
+class QToolButton;
 class QDoubleSpinBox;
 class QSpinBox;
 class QComboBox;
 class QCheckBox;
 class QVBoxLayout;
 class QHBoxLayout;
-class FilterChainModel;
+class BaseFilterConfigWidget;
 
 /**
  * @brief Виджет элемента фильтра в цепочке
@@ -23,8 +29,7 @@ class FilterChainModel;
  * Отображает один фильтр с его параметрами и предоставляет интерфейс
  * для редактирования параметров, удаления и изменения порядка фильтра.
  */
-class FilterItemWidget : public QWidget
-{
+class FilterItemWidget : public QWidget {
     Q_OBJECT
 
 public:
@@ -36,23 +41,16 @@ public:
      * @param canRemove Можно ли удалить фильтр (false если это единственный фильтр)
      * @param canMoveUp Можно ли переместить фильтр вверх
      * @param canMoveDown Можно ли переместить фильтр вниз
-     * @param filterChainModel Модель цепочки фильтров
      * @param parent Родительский виджет
      */
-    explicit FilterItemWidget(
-        size_t filterIndex,
-        const std::string& filterName,
-        const std::map<std::string, QVariant>& parameters,
-        bool canRemove,
-        bool canMoveUp,
-        bool canMoveDown,
-        FilterChainModel* filterChainModel,
-        QWidget* parent = nullptr);
+    explicit FilterItemWidget(size_t filterIndex, const std::string& filterName,
+                              const std::map<std::string, QVariant>& parameters, bool canRemove, bool canMoveUp,
+                              bool canMoveDown, QWidget* parent = nullptr);
 
     /**
      * @brief Деструктор
      */
-    ~FilterItemWidget() override = default;
+    ~FilterItemWidget() override;
 
     /**
      * @brief Обновляет параметры фильтра
@@ -109,11 +107,6 @@ signals:
 
 private slots:
     /**
-     * @brief Обработчик изменения параметра
-     */
-    void onParameterChanged();
-
-    /**
      * @brief Обработчик нажатия кнопки удаления
      */
     void onRemoveClicked();
@@ -135,101 +128,18 @@ private slots:
 
 private:
     /**
-     * @brief Инициализирует UI виджета
+     * @brief Обработчик переключения видимости параметров фильтра.
+     * @param checked Флаг, указывающий, должны ли параметры быть видимыми.
      */
-    void setupUI();
+    void onToggleParametersClicked(bool checked);
 
     /**
-     * @brief Создает виджеты параметров для фильтра
+     * @brief Создает конфигурационный виджет для указанного фильтра
+     *        и добавляет его в layout параметров.
      * @param filterName Имя фильтра
      * @param parameters Параметры фильтра
      */
-    void createParameterWidgets(const std::string& filterName, const std::map<std::string, QVariant>& parameters);
-
-    /**
-     * @brief Создает виджет для параметра brightness_factor
-     */
-    void createBrightnessWidget(const QVariant& value);
-
-    /**
-     * @brief Создает виджет для параметра contrast_factor
-     */
-    void createContrastWidget(const QVariant& value);
-
-    /**
-     * @brief Создает виджет для параметра saturation_factor
-     */
-    void createSaturationWidget(const QVariant& value);
-
-    /**
-     * @brief Создает виджет для параметра blur_radius
-     */
-    void createBlurRadiusWidget(const QVariant& value);
-
-    /**
-     * @brief Создает виджет для параметра box_blur_radius
-     */
-    void createBoxBlurRadiusWidget(const QVariant& value);
-
-    /**
-     * @brief Создает виджет для параметра motion_blur_length
-     */
-    void createMotionBlurLengthWidget(const QVariant& value);
-
-    /**
-     * @brief Создает виджет для параметра motion_blur_angle
-     */
-    void createMotionBlurAngleWidget(const QVariant& value);
-
-    /**
-     * @brief Создает виджет для параметра median_radius
-     */
-    void createMedianRadiusWidget(const QVariant& value);
-
-    /**
-     * @brief Создает виджет для параметра noise_intensity
-     */
-    void createNoiseIntensityWidget(const QVariant& value);
-
-    /**
-     * @brief Создает виджет для параметра posterize_levels
-     */
-    void createPosterizeLevelsWidget(const QVariant& value);
-
-    /**
-     * @brief Создает виджет для параметра threshold_value
-     */
-    void createThresholdValueWidget(const QVariant& value);
-
-    /**
-     * @brief Создает виджет для параметра vignette_strength
-     */
-    void createVignetteStrengthWidget(const QVariant& value);
-
-    /**
-     * @brief Создает виджет для параметра sharpen_strength
-     */
-    void createSharpenStrengthWidget(const QVariant& value);
-
-    /**
-     * @brief Создает виджет для параметра edge_sensitivity
-     */
-    void createEdgeSensitivityWidget(const QVariant& value);
-
-    /**
-     * @brief Создает виджет для параметра edge_operator
-     */
-    void createEdgeOperatorWidget(const QVariant& value);
-
-    /**
-     * @brief Создает виджет для параметра emboss_strength
-     */
-    void createEmbossStrengthWidget(const QVariant& value);
-
-    /**
-     * @brief Создает виджет для параметра counter_clockwise
-     */
-    void createCounterClockwiseWidget(const QVariant& value);
+    void createConfigWidget(const std::string& filterName, const std::map<std::string, QVariant>& parameters);
 
     /**
      * @brief Получает русское название фильтра
@@ -238,18 +148,9 @@ private:
      */
     static QString getFilterDisplayName(const std::string& filterName);
 
-    size_t filterIndex_;                          ///< Индекс фильтра в цепочке
-    std::string filterName_;                     ///< Имя фильтра
-    FilterChainModel* filterChainModel_;         ///< Модель цепочки фильтров
-    QVBoxLayout* mainLayout_;                   ///< Основной layout
-    QHBoxLayout* headerLayout_;                  ///< Layout заголовка
-    QLabel* filterNameLabel_;                   ///< Метка с именем фильтра
-    QPushButton* changeTypeButton_;             ///< Кнопка изменения типа фильтра
-    QPushButton* removeButton_;                  ///< Кнопка удаления
-    QPushButton* moveUpButton_;                 ///< Кнопка "Вверх"
-    QPushButton* moveDownButton_;               ///< Кнопка "Вниз"
-    QVBoxLayout* parametersLayout_;             ///< Layout для параметров
-    std::map<std::string, QWidget*> parameterWidgets_;  ///< Виджеты параметров по имени
-    bool updatingParameters_;                   ///< Флаг обновления параметров (для предотвращения рекурсии)
+    size_t filterIndex_;                                   ///< Индекс фильтра в цепочке
+    std::string filterName_;                               ///< Имя фильтра
+    Ui::FilterItemWidget* ui_;                             ///< Автосгенерированный UI класс
+    BaseFilterConfigWidget* configWidget_;                 ///< Конфигурационный виджет фильтра
+    bool parametersVisible_ = true;                        ///< Текущее состояние видимости параметров
 };
-

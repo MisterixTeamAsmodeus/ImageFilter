@@ -47,12 +47,35 @@ add_executable(${PROJECT_NAME}
     controller/ImageProcessorController.h
     
     # GUI компоненты
+    gui/BaseFilterConfigWidget.cpp
+    gui/BaseFilterConfigWidget.h
+    gui/FilterWidgetFactory.cpp
+    gui/FilterWidgetFactory.h
+    gui/filters/BrightnessFilterWidget.cpp
+    gui/filters/BrightnessFilterWidget.h
+    gui/filters/BrightnessFilterWidget.ui
+    gui/filters/BlurFilterWidget.cpp
+    gui/filters/BlurFilterWidget.h
+    gui/filters/BlurFilterWidget.ui
+    gui/filters/BoxBlurFilterWidget.cpp
+    gui/filters/BoxBlurFilterWidget.h
+    gui/filters/BoxBlurFilterWidget.ui
+    gui/filters/ContrastFilterWidget.cpp
+    gui/filters/ContrastFilterWidget.h
+    gui/filters/ContrastFilterWidget.ui
+    gui/filters/MotionBlurFilterWidget.cpp
+    gui/filters/MotionBlurFilterWidget.h
+    gui/filters/MotionBlurFilterWidget.ui
+    gui/filters/SaturationFilterWidget.cpp
+    gui/filters/SaturationFilterWidget.h
+    gui/filters/SaturationFilterWidget.ui
     gui/MainWindow.cpp
     gui/MainWindow.h
     gui/MainWindow.ui
     gui/FilterChainPanel.cpp
     gui/FilterChainPanel.h
     gui/FilterChainPanel.ui
+    gui/FilterItemWidget.ui
     gui/FilterItemWidget.cpp
     gui/FilterItemWidget.h
     gui/PreviewWidget.cpp
@@ -64,6 +87,9 @@ add_executable(${PROJECT_NAME}
     gui/FilterProxyModel.h
     gui/FilterListModel.cpp
     gui/FilterListModel.h
+
+    # Ресурсы иконок
+    gui/FilterItemWidget.qrc
 )
 
 # Настройка include-директорий

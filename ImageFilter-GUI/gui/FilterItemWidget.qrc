@@ -1,0 +1,10 @@
+<RCC>
+    <qresource prefix="/icons">
+        <file alias="edit.png">../resourse/edit.png</file>
+        <file alias="up.png">../resourse/up.png</file>
+        <file alias="down.png">../resourse/down.png</file>
+        <file alias="delete.png">../resourse/delete.png</file>
+    </qresource>
+</RCC>
+
+
