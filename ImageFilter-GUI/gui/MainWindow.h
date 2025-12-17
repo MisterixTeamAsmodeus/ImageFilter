@@ -1,9 +1,10 @@
 #pragma once
 
 #include <QMainWindow>
-#include <QMenuBar>
-#include <QStatusBar>
-#include <QSplitter>
+#include <QImage>
+#include <QString>
+#include <QElapsedTimer>
+
 #include <memory>
 
 // Forward declarations
@@ -12,6 +13,7 @@ class PreviewWidget;
 class FilterChainModel;
 class ImageModel;
 class ImageProcessorController;
+class QProgressBar;
 
 namespace Ui
 {
@@ -107,6 +109,15 @@ private:
     void setupStatusBar();
 
     /**
+     * @brief Отображает статус обработки в статус-баре.
+     *
+     * @param success Флаг успешности операции.
+     * @param durationMs Длительность обработки в миллисекундах.
+     * @param message Дополнительное текстовое сообщение (опционально).
+     */
+    void showProcessingStatus(bool success, qint64 durationMs, const QString& message = QString());
+
+    /**
      * @brief Обновляет состояние меню в зависимости от состояния приложения
      */
     void updateMenuState();
@@ -126,6 +137,9 @@ private:
 
     FilterChainPanel* filterChainPanel_;        ///< Панель управления цепочкой фильтров
     PreviewWidget* previewWidget_;              ///< Виджет предпросмотра
+
+    QProgressBar* processingProgressBar_ = nullptr; ///< Индикатор прогресса обработки
+    QElapsedTimer processingTimer_;                 ///< Таймер измерения времени обработки
 
     std::unique_ptr<FilterChainModel> filterChainModel_;    ///< Модель цепочки фильтров
     std::unique_ptr<ImageModel> imageModel_;                ///< Модель изображения

@@ -49,6 +49,8 @@ add_executable(${PROJECT_NAME}
     # GUI компоненты
     gui/BaseFilterConfigWidget.cpp
     gui/BaseFilterConfigWidget.h
+    gui/ClickableSlider.cpp
+    gui/ClickableSlider.h
     gui/FilterWidgetFactory.cpp
     gui/FilterWidgetFactory.h
     gui/filters/BrightnessFilterWidget.cpp
@@ -90,6 +92,9 @@ add_executable(${PROJECT_NAME}
 
     # Ресурсы иконок
     gui/FilterItemWidget.qrc
+
+    # Ресурсы стилей
+    style.qrc
 )
 
 # Настройка include-директорий

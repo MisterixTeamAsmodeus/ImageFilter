@@ -101,9 +101,6 @@ QString FilterItemWidget::getFilterDisplayName(const std::string& filterName) {
 }
 
 void FilterItemWidget::updateParameters(const std::map<std::string, QVariant>& parameters) {
-    if (configWidget_ == nullptr) {
-        return;
-    }
     configWidget_->setParameters(parameters);
 }
 
@@ -119,23 +116,16 @@ void FilterItemWidget::onToggleParametersClicked(bool checked) {
 
 void FilterItemWidget::updateFilterName(const std::string& filterName) {
     filterName_ = filterName;
-    if (ui_ != nullptr && ui_->filterNameLabel != nullptr) {
-        ui_->filterNameLabel->setText(getFilterDisplayName(filterName_));
-    }
+    ui_->filterNameLabel->setText(getFilterDisplayName(filterName_));
+
     // Пересоздаем конфигурационный виджет для нового типа фильтра
     createConfigWidget(filterName_, {});
 }
 
 void FilterItemWidget::updateButtonsState(bool canRemove, bool canMoveUp, bool canMoveDown) {
-    if (ui_ != nullptr && ui_->removeButton != nullptr) {
-        ui_->removeButton->setEnabled(canRemove);
-    }
-    if (ui_ != nullptr && ui_->moveUpButton != nullptr) {
-        ui_->moveUpButton->setEnabled(canMoveUp);
-    }
-    if (ui_ != nullptr && ui_->moveDownButton != nullptr) {
-        ui_->moveDownButton->setEnabled(canMoveDown);
-    }
+    ui_->removeButton->setEnabled(canRemove);
+    ui_->moveUpButton->setEnabled(canMoveUp);
+    ui_->moveDownButton->setEnabled(canMoveDown);
 }
 
 void FilterItemWidget::onRemoveClicked() {

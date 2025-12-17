@@ -1,6 +1,7 @@
 #include <gui/filters/ContrastFilterWidget.h>
 
-#include <QDoubleSpinBox>
+#include <QLabel>
+#include <QSlider>
 
 #include "ui_ContrastFilterWidget.h"
 
@@ -15,11 +16,13 @@ ContrastFilterWidget::ContrastFilterWidget(QWidget* parent)
     , updating_(false)
 {
     ui_->setupUi(this);
-    ui_->contrastSpinBox->setValue(DefaultContrastFactor);
+    const int sliderValue = static_cast<int>(DefaultContrastFactor * 10);
+    ui_->contrastSlider->setValue(sliderValue);
+    updateValueLabel(DefaultContrastFactor);
 
     QObject::connect(
-        ui_->contrastSpinBox,
-        QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+        ui_->contrastSlider,
+        &QSlider::valueChanged,
         this,
         &ContrastFilterWidget::onContrastChanged);
 }
@@ -32,24 +35,34 @@ void ContrastFilterWidget::setParameters(const std::map<std::string, QVariant>& 
         : DefaultContrastFactor;
 
     updating_ = true;
-    ui_->contrastSpinBox->setValue(factor);
+    const int sliderValue = static_cast<int>(factor * 10);
+    ui_->contrastSlider->setValue(sliderValue);
+    updateValueLabel(factor);
     updating_ = false;
 }
 
 std::map<std::string, QVariant> ContrastFilterWidget::getParameters() const
 {
     std::map<std::string, QVariant> result;
-    result.emplace("contrast_factor", QVariant(ui_->contrastSpinBox->value()));
+    const double factor = static_cast<double>(ui_->contrastSlider->value()) / 10.0;
+    result.emplace("contrast_factor", QVariant(factor));
     return result;
 }
 
-void ContrastFilterWidget::onContrastChanged(double value)
+void ContrastFilterWidget::onContrastChanged(int value)
 {
     if (updating_)
     {
         return;
     }
 
-    emit parameterChanged("contrast_factor", QVariant(value));
+    const double factor = static_cast<double>(value) / 10.0;
+    updateValueLabel(factor);
+    emit parameterChanged("contrast_factor", QVariant(factor));
+}
+
+void ContrastFilterWidget::updateValueLabel(double value)
+{
+    ui_->valueLabel->setText(QString::number(value, 'f', 1) + "x");
 }
 

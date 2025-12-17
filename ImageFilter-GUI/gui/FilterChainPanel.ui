@@ -12,19 +12,19 @@
   </property>
   <layout class="QVBoxLayout" name="mainLayout">
    <property name="spacing">
-    <number>5</number>
+    <number>8</number>
    </property>
    <property name="leftMargin">
-    <number>5</number>
+    <number>12</number>
    </property>
    <property name="topMargin">
-    <number>5</number>
+    <number>12</number>
    </property>
    <property name="rightMargin">
-    <number>5</number>
+    <number>12</number>
    </property>
    <property name="bottomMargin">
-    <number>5</number>
+    <number>12</number>
    </property>
    <item>
     <widget class="QPushButton" name="addFilterButton">
@@ -60,20 +60,22 @@
        </rect>
       </property>
       <property name="styleSheet">
-       <string notr="true">#filterListWidget {background-color: rgb(190, 190, 190)}</string>
+       <string notr="true">#filterListWidget {
+    background-color: #F8F9FA;
+}</string>
       </property>
       <layout class="QVBoxLayout" name="filterListLayout">
        <property name="spacing">
-        <number>5</number>
+        <number>10</number>
        </property>
        <property name="leftMargin">
-        <number>8</number>
+        <number>0</number>
        </property>
        <property name="topMargin">
-        <number>8</number>
+        <number>0</number>
        </property>
        <property name="rightMargin">
-        <number>8</number>
+        <number>0</number>
        </property>
        <property name="bottomMargin">
         <number>0</number>

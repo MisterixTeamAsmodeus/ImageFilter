@@ -1,0 +1,139 @@
+/* Глобальная светлая тема для ImageFilter-GUI */
+
+/* Базовые цвета:
+ *  - Панели: #F8F9FA
+ *  - Центральные области/карточки: #FFFFFF
+ *  - Основной текст: #212529
+ *  - Второстепенный текст: #6C757D
+ *  - Границы: #CED4DA
+ *  - Разделители: #E0E0E0
+ *  - Акцент: #6C5CE7
+ */
+
+/* Общие настройки текста */
+QWidget {
+    color: #212529;
+    background-color: #F8F9FA;
+}
+
+QLabel {
+    color: #212529;
+}
+
+/* Второстепенный текст: подписи к параметрам и т.п. */
+QLabel[role="secondary"],
+QCheckBox[role="secondary"],
+QRadioButton[role="secondary"] {
+    color: #6C757D;
+}
+
+QCheckBox,
+QRadioButton {
+    color: #212529;
+}
+
+/* Поля ввода чисел и текста */
+QLineEdit,
+QSpinBox,
+QDoubleSpinBox,
+QComboBox {
+    background-color: #FFFFFF;
+    border: 1px solid #CED4DA;
+    border-radius: 6px;
+    padding: 3px 6px;
+}
+
+QLineEdit:focus,
+QSpinBox:focus,
+QDoubleSpinBox:focus,
+QComboBox:focus {
+    border: 1px solid #6C5CE7;
+}
+
+/* Выпадающие списки */
+QComboBox::drop-down {
+    border: none;
+}
+
+/* Подсказки при наведении */
+QToolTip {
+    background-color: #F1F3F5;
+    color: #212529;
+    border: 1px solid #CED4DA;
+    padding: 4px 8px;
+}
+
+/* Статус-бар по умолчанию (будет уточнён позже) */
+QStatusBar {
+    background-color: #E9ECEF;
+    color: #495057;
+}
+
+/* Основные кнопки действий */
+QPushButton#addFilterButton {
+    background-color: #6C5CE7;
+    color: #FFFFFF;
+    border-radius: 6px;
+    padding: 4px 12px;
+    border: none;
+}
+
+QPushButton#addFilterButton:hover {
+    background-color: #5b4fd1;
+}
+
+/* Кнопки управления фильтрами в карточке */
+QPushButton#changeTypeButton,
+QPushButton#moveUpButton,
+QPushButton#moveDownButton,
+QPushButton#removeButton {
+    background-color: transparent;
+    border-radius: 6px;
+    border: none;
+}
+
+QPushButton#changeTypeButton:hover,
+QPushButton#moveUpButton:hover,
+QPushButton#moveDownButton:hover,
+QPushButton#removeButton:hover {
+    background-color: #F1F3F5;
+}
+
+QPushButton#changeTypeButton:pressed,
+QPushButton#moveUpButton:pressed,
+QPushButton#moveDownButton:pressed,
+QPushButton#removeButton:pressed {
+    background-color: #E9ECEF;
+}
+
+/* Горизонтальные слайдеры с акцентным цветом */
+QSlider::groove:horizontal {
+    border: 1px solid #CED4DA;
+    height: 6px;
+    background: #F1F3F5;
+    border-radius: 3px;
+}
+
+QSlider::sub-page:horizontal {
+    background: #6C5CE7;
+    border-radius: 3px;
+}
+
+QSlider::add-page:horizontal {
+    background: #E9ECEF;
+    border-radius: 3px;
+}
+
+QSlider::handle:horizontal {
+    background: #FFFFFF;
+    border: 1px solid #CED4DA;
+    width: 14px;
+    margin: -5px 0;
+    border-radius: 7px;
+}
+
+QSlider::handle:horizontal:hover {
+    border-color: #6C5CE7;
+}
+
+

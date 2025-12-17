@@ -22,9 +22,21 @@ public:
 
 private slots:
     void onLengthChanged(int value);
-    void onAngleChanged(double value);
+    void onAngleChanged(int value);
 
 private:
+    /**
+     * @brief Обновляет текст метки значения длины.
+     * @param value Значение длины.
+     */
+    void updateLengthValueLabel(int value);
+
+    /**
+     * @brief Обновляет текст метки значения угла.
+     * @param value Значение угла.
+     */
+    void updateAngleValueLabel(double value);
+
     Ui::MotionBlurFilterWidget* ui_;
     bool updating_;
 };

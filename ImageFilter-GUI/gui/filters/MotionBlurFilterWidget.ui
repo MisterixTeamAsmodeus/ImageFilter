@@ -30,7 +30,7 @@
       </widget>
      </item>
      <item>
-      <widget class="QSpinBox" name="lengthSpinBox">
+      <widget class="ClickableSlider" name="lengthSlider">
        <property name="minimum">
         <number>1</number>
        </property>
@@ -40,20 +40,29 @@
        <property name="value">
         <number>10</number>
        </property>
-      </widget>
-     </item>
-     <item>
-      <spacer name="horizontalSpacer">
+       <property name="tracking">
+        <bool>false</bool>
+       </property>
        <property name="orientation">
         <enum>Qt::Horizontal</enum>
        </property>
-       <property name="sizeHint" stdset="0">
+      </widget>
+     </item>
+     <item>
+      <widget class="QLabel" name="lengthValueLabel">
+       <property name="minimumSize">
         <size>
-         <width>40</width>
-         <height>20</height>
+         <width>30</width>
+         <height>0</height>
         </size>
        </property>
-      </spacer>
+       <property name="text">
+        <string>10</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+       </property>
+      </widget>
      </item>
     </layout>
    </item>
@@ -67,44 +76,51 @@
       </widget>
      </item>
      <item>
-      <widget class="QDoubleSpinBox" name="angleSpinBox">
-       <property name="suffix">
-        <string>°</string>
-       </property>
-       <property name="decimals">
-        <number>1</number>
-       </property>
+      <widget class="ClickableSlider" name="angleSlider">
        <property name="minimum">
-        <double>0.000000000000000</double>
+        <number>0</number>
        </property>
        <property name="maximum">
-        <double>360.000000000000000</double>
-       </property>
-       <property name="singleStep">
-        <double>1.000000000000000</double>
+        <number>360</number>
        </property>
        <property name="value">
-        <double>0.000000000000000</double>
+        <number>0</number>
+       </property>
+       <property name="tracking">
+        <bool>false</bool>
+       </property>
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
        </property>
       </widget>
      </item>
      <item>
-      <spacer name="horizontalSpacer_2">
-       <property name="orientation">
-        <enum>Qt::Horizontal</enum>
-       </property>
-       <property name="sizeHint" stdset="0">
+      <widget class="QLabel" name="angleValueLabel">
+       <property name="minimumSize">
         <size>
          <width>40</width>
-         <height>20</height>
+         <height>0</height>
         </size>
        </property>
-      </spacer>
+       <property name="text">
+        <string>0°</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+       </property>
+      </widget>
      </item>
     </layout>
    </item>
   </layout>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>ClickableSlider</class>
+   <extends>QSlider</extends>
+   <header>gui/ClickableSlider.h</header>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections/>
 </ui>

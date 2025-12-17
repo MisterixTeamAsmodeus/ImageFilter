@@ -1,7 +1,7 @@
 #include <gui/filters/MotionBlurFilterWidget.h>
 
-#include <QDoubleSpinBox>
-#include <QSpinBox>
+#include <QLabel>
+#include <QSlider>
 
 #include "ui_MotionBlurFilterWidget.h"
 
@@ -17,18 +17,20 @@ MotionBlurFilterWidget::MotionBlurFilterWidget(QWidget* parent)
     , updating_(false)
 {
     ui_->setupUi(this);
-    ui_->lengthSpinBox->setValue(DefaultMotionBlurLength);
-    ui_->angleSpinBox->setValue(DefaultMotionBlurAngle);
+    ui_->lengthSlider->setValue(DefaultMotionBlurLength);
+    updateLengthValueLabel(DefaultMotionBlurLength);
+    ui_->angleSlider->setValue(static_cast<int>(DefaultMotionBlurAngle));
+    updateAngleValueLabel(DefaultMotionBlurAngle);
 
     QObject::connect(
-        ui_->lengthSpinBox,
-        QOverload<int>::of(&QSpinBox::valueChanged),
+        ui_->lengthSlider,
+        &QSlider::valueChanged,
         this,
         &MotionBlurFilterWidget::onLengthChanged);
 
     QObject::connect(
-        ui_->angleSpinBox,
-        QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+        ui_->angleSlider,
+        &QSlider::valueChanged,
         this,
         &MotionBlurFilterWidget::onAngleChanged);
 }
@@ -46,16 +48,18 @@ void MotionBlurFilterWidget::setParameters(const std::map<std::string, QVariant>
         : DefaultMotionBlurAngle;
 
     updating_ = true;
-    ui_->lengthSpinBox->setValue(length);
-    ui_->angleSpinBox->setValue(angle);
+    ui_->lengthSlider->setValue(length);
+    updateLengthValueLabel(length);
+    ui_->angleSlider->setValue(static_cast<int>(angle));
+    updateAngleValueLabel(angle);
     updating_ = false;
 }
 
 std::map<std::string, QVariant> MotionBlurFilterWidget::getParameters() const
 {
     std::map<std::string, QVariant> result;
-    result.emplace("motion_blur_length", QVariant(ui_->lengthSpinBox->value()));
-    result.emplace("motion_blur_angle", QVariant(ui_->angleSpinBox->value()));
+    result.emplace("motion_blur_length", QVariant(ui_->lengthSlider->value()));
+    result.emplace("motion_blur_angle", QVariant(static_cast<double>(ui_->angleSlider->value())));
     return result;
 }
 
@@ -66,16 +70,30 @@ void MotionBlurFilterWidget::onLengthChanged(int value)
         return;
     }
 
+    updateLengthValueLabel(value);
     emit parameterChanged("motion_blur_length", QVariant(value));
 }
 
-void MotionBlurFilterWidget::onAngleChanged(double value)
+void MotionBlurFilterWidget::onAngleChanged(int value)
 {
     if (updating_)
     {
         return;
     }
 
-    emit parameterChanged("motion_blur_angle", QVariant(value));
+    const double angle = static_cast<double>(value);
+    updateAngleValueLabel(angle);
+    emit parameterChanged("motion_blur_angle", QVariant(angle));
 }
+
+void MotionBlurFilterWidget::updateLengthValueLabel(int value)
+{
+    ui_->lengthValueLabel->setText(QString::number(value));
+}
+
+void MotionBlurFilterWidget::updateAngleValueLabel(double value)
+{
+    ui_->angleValueLabel->setText(QString::number(value, 'f', 1) + "°");
+}
+
 

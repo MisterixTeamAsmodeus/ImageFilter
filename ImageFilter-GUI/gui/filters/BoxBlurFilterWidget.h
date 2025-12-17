@@ -24,6 +24,12 @@ private slots:
     void onRadiusChanged(int value);
 
 private:
+    /**
+     * @brief Обновляет текст метки значения.
+     * @param value Значение радиуса.
+     */
+    void updateValueLabel(int value);
+
     Ui::BoxBlurFilterWidget* ui_;
     bool updating_;
 };

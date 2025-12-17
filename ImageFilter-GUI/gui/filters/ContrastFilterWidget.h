@@ -21,9 +21,15 @@ public:
     std::map<std::string, QVariant> getParameters() const override;
 
 private slots:
-    void onContrastChanged(double value);
+    void onContrastChanged(int value);
 
 private:
+    /**
+     * @brief Обновляет текст метки значения.
+     * @param value Значение коэффициента контрастности.
+     */
+    void updateValueLabel(double value);
+
     Ui::ContrastFilterWidget* ui_;
     bool updating_;
 };

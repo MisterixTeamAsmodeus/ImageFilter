@@ -1,6 +1,7 @@
 #include <gui/filters/BoxBlurFilterWidget.h>
 
-#include <QSpinBox>
+#include <QLabel>
+#include <QSlider>
 
 #include "ui_BoxBlurFilterWidget.h"
 
@@ -15,11 +16,12 @@ BoxBlurFilterWidget::BoxBlurFilterWidget(QWidget* parent)
     , updating_(false)
 {
     ui_->setupUi(this);
-    ui_->radiusSpinBox->setValue(DefaultBoxBlurRadius);
+    ui_->radiusSlider->setValue(DefaultBoxBlurRadius);
+    updateValueLabel(DefaultBoxBlurRadius);
 
     QObject::connect(
-        ui_->radiusSpinBox,
-        QOverload<int>::of(&QSpinBox::valueChanged),
+        ui_->radiusSlider,
+        &QSlider::valueChanged,
         this,
         &BoxBlurFilterWidget::onRadiusChanged);
 }
@@ -32,14 +34,15 @@ void BoxBlurFilterWidget::setParameters(const std::map<std::string, QVariant>& p
         : DefaultBoxBlurRadius;
 
     updating_ = true;
-    ui_->radiusSpinBox->setValue(radius);
+    ui_->radiusSlider->setValue(radius);
+    updateValueLabel(radius);
     updating_ = false;
 }
 
 std::map<std::string, QVariant> BoxBlurFilterWidget::getParameters() const
 {
     std::map<std::string, QVariant> result;
-    result.emplace("box_blur_radius", QVariant(ui_->radiusSpinBox->value()));
+    result.emplace("box_blur_radius", QVariant(ui_->radiusSlider->value()));
     return result;
 }
 
@@ -50,6 +53,13 @@ void BoxBlurFilterWidget::onRadiusChanged(int value)
         return;
     }
 
+    updateValueLabel(value);
     emit parameterChanged("box_blur_radius", QVariant(value));
 }
+
+void BoxBlurFilterWidget::updateValueLabel(int value)
+{
+    ui_->valueLabel->setText(QString::number(value));
+}
+
 

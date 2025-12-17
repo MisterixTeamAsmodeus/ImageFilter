@@ -26,7 +26,6 @@ FilterChainPanel::FilterChainPanel(FilterChainModel* filterChainModel, QWidget* 
 
     // Подключаемся к сигналам модели
     connect(filterChainModel_, &FilterChainModel::chainChanged, this, &FilterChainPanel::onChainChanged);
-    connect(filterChainModel_, &FilterChainModel::filterParameterChanged, this, &FilterChainPanel::onChainChanged);
 
     // Обновляем список фильтров
     updateFilterList();

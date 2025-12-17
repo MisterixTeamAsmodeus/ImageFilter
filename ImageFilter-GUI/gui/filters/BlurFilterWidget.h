@@ -21,9 +21,15 @@ public:
     std::map<std::string, QVariant> getParameters() const override;
 
 private slots:
-    void onRadiusChanged(double value);
+    void onRadiusChanged(int value);
 
 private:
+    /**
+     * @brief Обновляет текст метки значения.
+     * @param value Значение радиуса размытия.
+     */
+    void updateValueLabel(double value);
+
     Ui::BlurFilterWidget* ui_;
     bool updating_;
 };

@@ -1,6 +1,7 @@
 #include <gui/filters/BlurFilterWidget.h>
 
-#include <QDoubleSpinBox>
+#include <QLabel>
+#include <QSlider>
 
 #include "ui_BlurFilterWidget.h"
 
@@ -15,11 +16,13 @@ BlurFilterWidget::BlurFilterWidget(QWidget* parent)
     , updating_(false)
 {
     ui_->setupUi(this);
-    ui_->radiusSpinBox->setValue(DefaultBlurRadius);
+    const int sliderValue = static_cast<int>(DefaultBlurRadius * 10);
+    ui_->radiusSlider->setValue(sliderValue);
+    updateValueLabel(DefaultBlurRadius);
 
     QObject::connect(
-        ui_->radiusSpinBox,
-        QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+        ui_->radiusSlider,
+        &QSlider::valueChanged,
         this,
         &BlurFilterWidget::onRadiusChanged);
 }
@@ -32,24 +35,34 @@ void BlurFilterWidget::setParameters(const std::map<std::string, QVariant>& para
         : DefaultBlurRadius;
 
     updating_ = true;
-    ui_->radiusSpinBox->setValue(radius);
+    const int sliderValue = static_cast<int>(radius * 10);
+    ui_->radiusSlider->setValue(sliderValue);
+    updateValueLabel(radius);
     updating_ = false;
 }
 
 std::map<std::string, QVariant> BlurFilterWidget::getParameters() const
 {
     std::map<std::string, QVariant> result;
-    result.emplace("blur_radius", QVariant(ui_->radiusSpinBox->value()));
+    const double radius = static_cast<double>(ui_->radiusSlider->value()) / 10.0;
+    result.emplace("blur_radius", QVariant(radius));
     return result;
 }
 
-void BlurFilterWidget::onRadiusChanged(double value)
+void BlurFilterWidget::onRadiusChanged(int value)
 {
     if (updating_)
     {
         return;
     }
 
-    emit parameterChanged("blur_radius", QVariant(value));
+    const double radius = static_cast<double>(value) / 10.0;
+    updateValueLabel(radius);
+    emit parameterChanged("blur_radius", QVariant(radius));
+}
+
+void BlurFilterWidget::updateValueLabel(double value)
+{
+    ui_->valueLabel->setText(QString::number(value, 'f', 1));
 }
 

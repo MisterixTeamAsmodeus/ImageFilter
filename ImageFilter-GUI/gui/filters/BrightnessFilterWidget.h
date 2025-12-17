@@ -39,9 +39,9 @@ public:
 private slots:
     /**
      * @brief Обработчик изменения значения яркости.
-     * @param value Новое значение коэффициента яркости.
+     * @param value Новое значение слайдера (1-50, соответствует 0.1-5.0).
      */
-    void onBrightnessChanged(double value);
+    void onBrightnessChanged(int value);
 
 private:
     /**
@@ -49,8 +49,13 @@ private:
      */
     void initializeConnections();
 
+    /**
+     * @brief Обновляет текст метки значения.
+     * @param value Значение коэффициента яркости.
+     */
+    void updateValueLabel(double value);
+
     Ui::BrightnessFilterWidget* ui_; ///< Сгенерированный Qt UI.
-    bool updating_;                  ///< Флаг предотвращения рекурсивных обновлений.
 };
 
 

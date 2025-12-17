@@ -1,6 +1,7 @@
 #include <gui/filters/SaturationFilterWidget.h>
 
-#include <QDoubleSpinBox>
+#include <QLabel>
+#include <QSlider>
 
 #include "ui_SaturationFilterWidget.h"
 
@@ -15,11 +16,13 @@ SaturationFilterWidget::SaturationFilterWidget(QWidget* parent)
     , updating_(false)
 {
     ui_->setupUi(this);
-    ui_->saturationSpinBox->setValue(DefaultSaturationFactor);
+    const int sliderValue = static_cast<int>(DefaultSaturationFactor * 10);
+    ui_->saturationSlider->setValue(sliderValue);
+    updateValueLabel(DefaultSaturationFactor);
 
     QObject::connect(
-        ui_->saturationSpinBox,
-        QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+        ui_->saturationSlider,
+        &QSlider::valueChanged,
         this,
         &SaturationFilterWidget::onSaturationChanged);
 }
@@ -32,24 +35,34 @@ void SaturationFilterWidget::setParameters(const std::map<std::string, QVariant>
         : DefaultSaturationFactor;
 
     updating_ = true;
-    ui_->saturationSpinBox->setValue(factor);
+    const int sliderValue = static_cast<int>(factor * 10);
+    ui_->saturationSlider->setValue(sliderValue);
+    updateValueLabel(factor);
     updating_ = false;
 }
 
 std::map<std::string, QVariant> SaturationFilterWidget::getParameters() const
 {
     std::map<std::string, QVariant> result;
-    result.emplace("saturation_factor", QVariant(ui_->saturationSpinBox->value()));
+    const double factor = static_cast<double>(ui_->saturationSlider->value()) / 10.0;
+    result.emplace("saturation_factor", QVariant(factor));
     return result;
 }
 
-void SaturationFilterWidget::onSaturationChanged(double value)
+void SaturationFilterWidget::onSaturationChanged(int value)
 {
     if (updating_)
     {
         return;
     }
 
-    emit parameterChanged("saturation_factor", QVariant(value));
+    const double factor = static_cast<double>(value) / 10.0;
+    updateValueLabel(factor);
+    emit parameterChanged("saturation_factor", QVariant(factor));
+}
+
+void SaturationFilterWidget::updateValueLabel(double value)
+{
+    ui_->valueLabel->setText(QString::number(value, 'f', 1) + "x");
 }
 

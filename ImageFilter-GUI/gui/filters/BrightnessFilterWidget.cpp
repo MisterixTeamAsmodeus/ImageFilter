@@ -1,6 +1,7 @@
 #include <gui/filters/BrightnessFilterWidget.h>
 
-#include <QDoubleSpinBox>
+#include <QLabel>
+#include <QSlider>
 
 #include "ui_BrightnessFilterWidget.h"
 
@@ -12,10 +13,11 @@ namespace
 BrightnessFilterWidget::BrightnessFilterWidget(QWidget* parent)
     : BaseFilterConfigWidget(parent)
     , ui_(new Ui::BrightnessFilterWidget())
-    , updating_(false)
 {
     ui_->setupUi(this);
-    ui_->brightnessSpinBox->setValue(DefaultBrightnessFactor);
+    const int sliderValue = static_cast<int>(DefaultBrightnessFactor * 10);
+    ui_->brightnessSlider->setValue(sliderValue);
+    updateValueLabel(DefaultBrightnessFactor);
     initializeConnections();
 }
 
@@ -26,35 +28,38 @@ void BrightnessFilterWidget::setParameters(const std::map<std::string, QVariant>
         ? iterator->second.toDouble()
         : DefaultBrightnessFactor;
 
-    updating_ = true;
-    ui_->brightnessSpinBox->setValue(factor);
-    updating_ = false;
+    const int sliderValue = static_cast<int>(factor * 10);
+    ui_->brightnessSlider->setValue(sliderValue);
+    updateValueLabel(factor);
 }
 
 std::map<std::string, QVariant> BrightnessFilterWidget::getParameters() const
 {
     std::map<std::string, QVariant> result;
-    result.emplace("brightness_factor", QVariant(ui_->brightnessSpinBox->value()));
+    const double factor = static_cast<double>(ui_->brightnessSlider->value()) / 10.0;
+    result.emplace("brightness_factor", QVariant(factor));
     return result;
 }
 
-void BrightnessFilterWidget::onBrightnessChanged(double value)
+void BrightnessFilterWidget::onBrightnessChanged(int value)
 {
-    if (updating_)
-    {
-        return;
-    }
-
-    emit parameterChanged("brightness_factor", QVariant(value));
+    const double factor = static_cast<double>(value) / 10.0;
+    updateValueLabel(factor);
+    emit parameterChanged("brightness_factor", QVariant(factor));
 }
 
 void BrightnessFilterWidget::initializeConnections()
 {
     QObject::connect(
-        ui_->brightnessSpinBox,
-        QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+        ui_->brightnessSlider,
+        &QSlider::valueChanged,
         this,
         &BrightnessFilterWidget::onBrightnessChanged);
+}
+
+void BrightnessFilterWidget::updateValueLabel(double value)
+{
+    ui_->valueLabel->setText(QString::number(value, 'f', 1) + "x");
 }
 
 

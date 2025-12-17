@@ -6,11 +6,11 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>209</width>
-    <height>50</height>
+    <width>660</width>
+    <height>35</height>
    </rect>
   </property>
-   <property name="sizePolicy">
+  <property name="sizePolicy">
    <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
     <horstretch>0</horstretch>
     <verstretch>0</verstretch>
@@ -19,24 +19,31 @@
   <property name="minimumSize">
    <size>
     <width>0</width>
-    <height>50</height>
+    <height>35</height>
    </size>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">#FilterItemWidget {
+    background-color: #FFFFFF;
+    border: 1px solid #E0E0E0;
+    border-radius: 12px;
+}</string>
   </property>
   <layout class="QVBoxLayout" name="mainLayout">
    <property name="spacing">
-    <number>5</number>
+    <number>8</number>
    </property>
    <property name="leftMargin">
-    <number>5</number>
+    <number>8</number>
    </property>
    <property name="topMargin">
-    <number>5</number>
+    <number>8</number>
    </property>
    <property name="rightMargin">
-    <number>5</number>
+    <number>8</number>
    </property>
    <property name="bottomMargin">
-    <number>5</number>
+    <number>0</number>
    </property>
    <item>
     <layout class="QHBoxLayout" name="headerLayout">
@@ -63,18 +70,25 @@
        <property name="text">
         <string/>
        </property>
-       <property name="arrowType">
-        <enum>Qt::DownArrow</enum>
-       </property>
        <property name="autoRaise">
         <bool>true</bool>
+       </property>
+       <property name="arrowType">
+        <enum>Qt::DownArrow</enum>
        </property>
       </widget>
      </item>
      <item>
       <widget class="QLabel" name="filterNameLabel">
+       <property name="font">
+        <font>
+         <pointsize>10</pointsize>
+         <weight>75</weight>
+         <bold>true</bold>
+        </font>
+       </property>
        <property name="styleSheet">
-        <string notr="true">QLabel { font-weight: bold; }</string>
+        <string notr="true">QLabel { color: #212529; }</string>
        </property>
        <property name="text">
         <string>Фильтр</string>
@@ -228,9 +242,27 @@
     </layout>
    </item>
    <item>
+    <widget class="QFrame" name="headerSeparator">
+     <property name="styleSheet">
+      <string notr="true">QFrame#headerSeparator {
+    color: #E0E0E0;
+    background-color: #E0E0E0;
+    max-height: 1px;
+    min-height: 1px;
+}</string>
+     </property>
+     <property name="frameShape">
+      <enum>QFrame::HLine</enum>
+     </property>
+     <property name="frameShadow">
+      <enum>QFrame::Plain</enum>
+     </property>
+    </widget>
+   </item>
+   <item>
     <widget class="QWidget" name="parametersLayout" native="true">
      <property name="sizePolicy">
-      <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
+      <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
        <horstretch>0</horstretch>
        <verstretch>0</verstretch>
       </sizepolicy>
